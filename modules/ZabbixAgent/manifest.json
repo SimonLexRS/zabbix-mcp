@@ -4,7 +4,7 @@
 	"type": "module",
 	"name": "AI agent",
 	"namespace": "ZabbixAgent",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"author": "Simon Alex Rodriguez",
 	"url": "https://github.com/SimonLexRS/zabbix-mcp",
 	"description": "Agentic chat for Zabbix through its native MCP server: streaming, tool calls, approval of changes, plans and tasks, with OpenAI-compatible and Anthropic-compatible (Claude) providers. English and Spanish.",

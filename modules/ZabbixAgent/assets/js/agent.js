@@ -62,14 +62,14 @@
 		wide: '<path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/>',
 		narrow: '<path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5"/>',
 		close: '<path d="M6 6l12 12M18 6L6 18"/>',
-		gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
+		gear: '<path d="M10.3 3h3.4l.5 2.4 1.6.9 2.3-.8 1.7 2.9-1.8 1.6v1.9l1.8 1.6-1.7 2.9-2.3-.8-1.6.9-.5 2.4h-3.4l-.5-2.4'
+			+ '-1.6-.9-2.3.8-1.7-2.9 1.8-1.6v-1.9L4.2 8.4l1.7-2.9 2.3.8 1.6-.9z"/><circle cx="12" cy="12" r="2.6"/>',
 		page: '<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
 		chat: '<path d="M20 12.5a7.5 7.5 0 0 1-11.2 6.5L4 20l1.2-4.3A7.5 7.5 0 1 1 20 12.5z"/>'
 			+ '<path d="M12.5 8.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" fill="currentColor" stroke="none"/>',
 		sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4'
 			+ 'M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
-		moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
-		auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'
+		moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'
 	};
 
 	/* Pairs of Zabbix themes: the light and the dark version of the same look. */
@@ -441,33 +441,45 @@
 			return zabbix;
 		}
 
-		button() {
-			const button = iconButton('auto', t('Theme'), 'zbxagent-theme');
+		static dark(theme) {
+			return theme in LIGHT_OF;
+		}
 
-			button.addEventListener('click', () => this.cycle());
+		button() {
+			const button = iconButton('moon', t('Theme'), 'zbxagent-theme');
+
+			button.addEventListener('click', () => this.toggle());
 			this.buttons.push(button);
 			this.apply();
 
 			return button;
 		}
 
-		cycle() {
-			this.mode = THEME_MODES[(THEME_MODES.indexOf(this.mode) + 1) % THEME_MODES.length];
+		/* Each click shows the opposite; when that is the theme of Zabbix, the chat follows Zabbix again. */
+		toggle() {
+			const target = Theme.dark(this.resolve()) ? 'light' : 'dark';
+			const zabbix = Theme.zabbix();
+
+			this.mode = Theme.dark(zabbix) === (target === 'dark') ? 'auto' : target;
 			this.ui.set({theme: this.mode});
 			this.apply();
 		}
 
 		apply() {
 			const theme = this.resolve();
-			const label = {
-				auto: t('Theme: as in Zabbix'),
-				light: t('Theme: light'),
-				dark: t('Theme: dark')
-			}[this.mode] + ' · ' + t('Click to change it. Only the chat changes.');
+			const dark = Theme.dark(theme);
+			const label = (dark ? t('Switch to light (only the chat)') : t('Switch to dark (only the chat)'))
+				+ ' · ' + t('Zabbix theme') + ': ' + Theme.zabbix();
 
-			this.roots.forEach((root) => root.setAttribute('data-theme', theme));
+			this.roots.forEach((root) => {
+				root.classList.add('is-switching');
+				root.setAttribute('data-theme', theme);
+			});
+			requestAnimationFrame(() => requestAnimationFrame(() =>
+				this.roots.forEach((root) => root.classList.remove('is-switching'))
+			));
 			this.buttons.forEach((button) => {
-				button.innerHTML = icon({auto: 'auto', light: 'sun', dark: 'moon'}[this.mode]);
+				button.innerHTML = icon(dark ? 'sun' : 'moon');
 				button.title = label;
 				button.setAttribute('aria-label', label);
 			});
@@ -1775,11 +1787,11 @@
 			this.launcher.append(el('span', 'zbxagent-badge'));
 			this.launcher.addEventListener('click', () => this.open());
 
-			this.panel = el('section', 'zbxagent-panel');
+			this.panel = el('div', 'zbxagent-panel');
 			this.panel.setAttribute('role', 'dialog');
 			this.panel.setAttribute('aria-label', t('AI agent'));
 
-			const head = el('header', 'zbxagent-head');
+			const head = el('div', 'zbxagent-head');
 			const mark = el('span', 'zbxagent-mark');
 			mark.innerHTML = icon('spark');
 
@@ -1795,7 +1807,7 @@
 			this.theme = new Theme(this.ui, [this.root, this.chat]);
 			actions.append(this.theme.button());
 
-			if (config.settings_url) {
+			if (config.settings_url && new URLSearchParams(location.search).get('action') !== 'agent.settings') {
 				const settings = iconButton('gear', t('Settings'));
 				settings.addEventListener('click', () => { location.href = config.settings_url; });
 				actions.append(settings);

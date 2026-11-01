@@ -189,7 +189,7 @@ Pulsa el **botón redondo de la esquina inferior derecha**, en cualquier página
 | **Minimizado** | Solo la barra del título, con lo que está haciendo el agente | Botón `–`, o `Esc` desde normal. Un clic en la barra lo restaura |
 | **Cerrado** | Solo el botón redondo. Un punto naranja avisa si espera tu aprobación; uno verde, que ya respondió | Botón `×` o `Ctrl+.` |
 
-**Colores:** el chat usa los del tema de Zabbix de cada usuario (los 7 temas). El botón ◐ de la cabecera alterna entre *como en Zabbix*, *claro* y *oscuro*; solo cambia el chat y se recuerda.
+**Colores:** el chat usa los del tema de Zabbix de cada usuario (los 7 temas). El botón de la luna o el sol, en la cabecera, cambia el chat a oscuro o a claro; al volver a pulsarlo, vuelve al tema de Zabbix. Solo cambia el chat y se recuerda. El engranaje de al lado abre los ajustes, y no aparece en la propia página de ajustes.
 
 ![Chat amplio](screenshots/dock-wide.png)
 
@@ -257,6 +257,7 @@ La página **Monitoring → AI agent** muestra el mismo chat a pantalla completa
 | 11 | 6 | Un proveedor respondía `HTTP 404` | Tenía tipo *Anthropic-compatible* con la URL `https://api.deepseek.com`, que es la de OpenAI | Usa la pareja correcta de la tabla del paso 5. **Test** lo detecta |
 | 12 | 6 | El chat no se ponía oscuro con *Dark blue* ni *Dark classic* | Solo reconocía `dark-theme` y `hc-dark`, de los 7 temas de Zabbix 8 | Ahora toma los colores de cada tema de Zabbix y tiene su propio botón claro/oscuro |
 | 13 | 6 | Selectores con aspecto nativo y textos cortados en Mac | Cada navegador dibuja `select` a su manera, y las etiquetas eran largas | Selectores propios, etiquetas cortas y el texto completo al pasar el ratón |
+| 14 | 6 | Al cambiar de tema, el chat parpadeaba y quedaban zonas claras; el engranaje parecía otro botón de tema | Zabbix anima el color de todos sus botones, y da fondo a todo `header`; el icono de ajustes parecía un sol | Sin transiciones dentro del chat, cabecera propia sin `header` e icono de engranaje con dientes |
 
 ## Otros problemas posibles
 

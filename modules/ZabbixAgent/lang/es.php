@@ -111,8 +111,7 @@ return [
 	'Plan' => 'Plan',
 	'Auto' => 'Auto',
 	'Theme' => 'Tema',
-	'Theme: as in Zabbix' => 'Tema: como en Zabbix',
-	'Theme: light' => 'Tema: claro',
-	'Theme: dark' => 'Tema: oscuro',
-	'Click to change it. Only the chat changes.' => 'Pulsa para cambiarlo. Solo cambia el chat.',
+	'Switch to dark (only the chat)' => 'Cambiar a oscuro (solo el chat)',
+	'Switch to light (only the chat)' => 'Cambiar a claro (solo el chat)',
+	'Zabbix theme' => 'Tema de Zabbix',
 ];

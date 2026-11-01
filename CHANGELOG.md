@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- The light/dark button switches between the two at each click, with a sun or a moon. When the result is the theme of Zabbix, the chat follows Zabbix again.
+- No more flashing when the theme changes: the controls of the chat no longer use the color transitions of Zabbix.
+- The settings button has a gear that doesn't look like a sun, and isn't shown on the settings page itself.
+- The borders of the settings page follow the theme, without light lines in the dark themes.
+
 ## 0.2.1
 
 - **Colors of Zabbix:** the chat takes the colors of the theme of the user, from the stylesheets of Zabbix itself, in its 7 themes: Blue, Dark, Dark blue, Blue classic, Dark classic and the two high-contrast ones. Before, only two dark themes were recognized.

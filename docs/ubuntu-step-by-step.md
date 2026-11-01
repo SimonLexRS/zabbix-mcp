@@ -189,7 +189,7 @@ Press the **round button in the lower-right corner**, on any page of Zabbix, or 
 | **Minimized** | Only the title bar, with what the agent is doing | `–` button, or `Esc` from normal. A click on the bar restores it |
 | **Closed** | Only the round button. An orange dot means it waits for your approval; a green one, that it answered | `×` button or `Ctrl+.` |
 
-**Colors:** the chat uses those of the Zabbix theme of each user (the 7 themes). The ◐ button in the header switches between *as in Zabbix*, *light* and *dark*; it changes only the chat and is remembered.
+**Colors:** the chat uses those of the Zabbix theme of each user (the 7 themes). The moon or sun button in the header turns the chat dark or light; another click brings back the Zabbix theme. It changes only the chat and is remembered. The gear next to it opens the settings, and isn't shown on the settings page itself.
 
 ![Wide chat](screenshots/dock-wide.png)
 
@@ -257,6 +257,7 @@ The page **Monitoring → AI agent** shows the same chat full screen, with the s
 | 11 | 6 | A provider answered `HTTP 404` | It had the *Anthropic-compatible* type with `https://api.deepseek.com`, the OpenAI URL | Use the right pair from the table of step 5. **Test** finds it |
 | 12 | 6 | The chat didn't turn dark with *Dark blue* or *Dark classic* | It only knew `dark-theme` and `hc-dark`, of the 7 themes of Zabbix 8 | It now takes the colors of each Zabbix theme and has its own light/dark button |
 | 13 | 6 | Native-looking selects and cut texts on Mac | Each browser draws `select` its own way, and the labels were long | Own selects, short labels and the full text on hover |
+| 14 | 6 | When changing the theme, the chat flashed and left light areas; the gear looked like a second theme button | Zabbix animates the color of all its buttons and gives a background to every `header`; the settings icon looked like a sun | No transitions inside the chat, own header without `header`, and a gear icon with teeth |
 
 ## Other possible problems
 

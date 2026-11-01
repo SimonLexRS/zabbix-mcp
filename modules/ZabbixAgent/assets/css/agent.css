@@ -152,6 +152,22 @@
 	cursor: pointer;
 	-webkit-appearance: none;
 	appearance: none;
+	transition: none;
+}
+
+/* Zabbix animates the colors of its controls; inside the chat they change at once, also when the theme changes. */
+#zbxagent select,
+#zbxagent textarea,
+#zbxagent input {
+	transition: none;
+}
+
+#zbxagent.is-switching,
+#zbxagent.is-switching *,
+#zbxagent-dock.is-switching,
+#zbxagent-dock.is-switching * {
+	transition: none !important;
+	animation: none !important;
 }
 
 #zbxagent button:focus,
@@ -1171,7 +1187,7 @@
 .zbxagent-settings-box {
 	margin-bottom: 16px;
 	padding: 12px 16px;
-	border: 1px solid #d3dade;
+	border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
 }
 
 .zbxagent-settings-box h4 {
@@ -1208,7 +1224,7 @@
 .zbxagent-provider {
 	margin-bottom: 14px;
 	padding: 12px;
-	border: 1px dashed #aab5bb;
+	border: 1px dashed color-mix(in srgb, currentColor 35%, transparent);
 }
 
 .zbxagent-provider-actions,
