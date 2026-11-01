@@ -44,6 +44,7 @@ A frontend module for Zabbix 8 that adds an agentic chat **floating on every pag
 | **Always at hand** | Floating button on every page. **Minimized**, **normal** or **wide**, and `Ctrl+.` to open or close it |
 | **Keeps going when you navigate** | Change section or module: the chat stays as it was, and an answer in progress goes on in the next page |
 | **Several tabs** | One tab runs the agent; the others follow it live and can stop it |
+| **Colors of Zabbix** | Follows the theme of each user, in the 7 themes, and has its own light/dark button |
 | **Investigates on its own** | Chains tools: problems, hosts, triggers, items and history |
 | **Asks for approval** | Shows what will change, and does it only if you allow it |
 | **Three modes** | *Ask*, *Plan* (read only) and *Auto*. Switch with `Shift+Tab` |
@@ -56,6 +57,8 @@ A frontend module for Zabbix 8 that adds an agentic chat **floating on every pag
 | Normal, next to Zabbix | Minimized | Dark theme |
 |---|---|---|
 | ![Normal](docs/screenshots/dock-normal.png) | ![Minimized](docs/screenshots/dock-min.png) | ![Dark](docs/screenshots/dock-dark.png) |
+| **Dark blue theme** | **High-contrast dark** | **In Spanish** |
+| ![Dark blue](docs/screenshots/theme-dark-blue.png) | ![High contrast](docs/screenshots/theme-hc-dark.png) | ![Spanish](docs/screenshots/dock-es.png) |
 | **Another tab follows it live** | **Waiting for your approval** | **Phone** |
 | ![Other tab](docs/screenshots/dock-other-tab.png) | ![Approval](docs/screenshots/approval.png) | ![Phone](docs/screenshots/dock-mobile.png) |
 
@@ -89,12 +92,12 @@ Read the [risks and responsibilities](docs/ubuntu-step-by-step.md#security), esp
 | Guide run with its own commands | Ubuntu 26.10 ARM64, Zabbix 8.0.0rc3 built from source |
 | Real conversations | DeepSeek on its OpenAI-compatible and Anthropic-compatible APIs, with real data |
 | Real browser (Chromium) | Streaming, tools, approve and reject, plan, stop, `/compact`, mobile and an HTML injection attempt |
-| Floating chat (Chromium) | Three sizes, `Ctrl+.` and `Esc`; stays open across sections; an answer goes on after changing page; an approval comes back after changing page and a rejection changes nothing; a second tab follows in read only and takes over when the first closes; phone; no dock in kiosk mode |
+| Floating chat (Chromium) | Three sizes, `Ctrl+.` and `Esc`; stays open across sections; an answer goes on after changing page; an approval comes back after changing page and a rejection changes nothing; a second tab follows in read only and takes over when the first closes; phone; no dock in kiosk mode; the 7 themes and the light/dark button; texts in Spanish not cut; wide panel next to the sidebar |
 | Permissions | A user without access gets the API error, and can't open the settings |
 | Tests and CI | Message conversion, streams, encryption and translations |
 
 > [!NOTE]
-> **Not tested:** AMD64, Ubuntu 26.04, Zabbix from packages, Apache, and the own APIs of OpenAI and Anthropic. The Spanish interface wasn't seen on screen, and the dark theme was seen by switching the stylesheet, not with the user setting. The floating chat was tested with its new assets and `agent.config` served from the working copy, before installing them on the server.
+> **Not tested:** AMD64, Ubuntu 26.04, Zabbix from packages, Apache, and the own APIs of OpenAI and Anthropic. The themes were tested by changing the theme in the HTML that Zabbix sends, not in the user profile, and the Spanish texts by loading their catalog in the chat. Safari wasn't tested. The floating chat was tested with its new assets and `agent.config` served from the working copy, before installing them on the server.
 
 ## What's included
 

@@ -189,6 +189,8 @@ Press the **round button in the lower-right corner**, on any page of Zabbix, or 
 | **Minimized** | Only the title bar, with what the agent is doing | `–` button, or `Esc` from normal. A click on the bar restores it |
 | **Closed** | Only the round button. An orange dot means it waits for your approval; a green one, that it answered | `×` button or `Ctrl+.` |
 
+**Colors:** the chat uses those of the Zabbix theme of each user (the 7 themes). The ◐ button in the header switches between *as in Zabbix*, *light* and *dark*; it changes only the chat and is remembered.
+
 ![Wide chat](screenshots/dock-wide.png)
 
 **When you change page, section or module** the chat stays the same: open or not, size, conversation, draft and scroll. Zabbix loads a new page on each click, so an answer in progress **goes on in the next page** from the last saved step:
@@ -253,6 +255,8 @@ The page **Monitoring → AI agent** shows the same chat full screen, with the s
 | 9 | 6 | The panel was under the sidebar on a phone | The Zabbix sidebar uses `z-index` 998 | The chat uses 999: above the sidebar and below the Zabbix dialogs (1000) |
 | 10 | 6 | A new tab didn't follow the conversation of the other | A chat without messages isn't stored, and each tab created one with another id | All the tabs use the id of the active chat |
 | 11 | 6 | A provider answered `HTTP 404` | It had the *Anthropic-compatible* type with `https://api.deepseek.com`, the OpenAI URL | Use the right pair from the table of step 5. **Test** finds it |
+| 12 | 6 | The chat didn't turn dark with *Dark blue* or *Dark classic* | It only knew `dark-theme` and `hc-dark`, of the 7 themes of Zabbix 8 | It now takes the colors of each Zabbix theme and has its own light/dark button |
+| 13 | 6 | Native-looking selects and cut texts on Mac | Each browser draws `select` its own way, and the labels were long | Own selects, short labels and the full text on hover |
 
 ## Other possible problems
 

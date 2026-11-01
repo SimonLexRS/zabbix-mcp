@@ -63,8 +63,20 @@
 		narrow: '<path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5"/>',
 		close: '<path d="M6 6l12 12M18 6L6 18"/>',
 		gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
-		page: '<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'
+		page: '<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+		chat: '<path d="M20 12.5a7.5 7.5 0 0 1-11.2 6.5L4 20l1.2-4.3A7.5 7.5 0 1 1 20 12.5z"/>'
+			+ '<path d="M12.5 8.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" fill="currentColor" stroke="none"/>',
+		sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4'
+			+ 'M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+		moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+		auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'
 	};
+
+	/* Pairs of Zabbix themes: the light and the dark version of the same look. */
+	const THEME_MODES = ['auto', 'light', 'dark'];
+	const DARK_OF = {'blue-theme': 'dark-theme', 'blue-classic-theme': 'dark-classic-theme', 'hc-light': 'hc-dark'};
+	const LIGHT_OF = {'dark-theme': 'blue-theme', 'dark-classic-theme': 'blue-classic-theme', 'hc-dark': 'hc-light',
+		'dark-blue-theme': 'blue-theme'};
 
 	let lang = {};
 	const t = (text) => lang[text] || text;
@@ -390,6 +402,78 @@
 		}
 	}
 
+	/*
+	 * The chat uses the theme of Zabbix, or its light or dark version when the user chooses it with the button of the
+	 * chat. Only the chat changes: Zabbix keeps the theme of the user profile.
+	 */
+	class Theme {
+		constructor(ui, roots) {
+			this.ui = ui;
+			this.roots = roots;
+			this.buttons = [];
+			this.mode = THEME_MODES.includes(ui.get().theme) ? ui.get().theme : 'auto';
+			this.apply();
+
+			window.addEventListener('storage', (e) => {
+				if (e.key === this.ui.key && this.ui.get().theme !== this.mode) {
+					this.mode = THEME_MODES.includes(this.ui.get().theme) ? this.ui.get().theme : 'auto';
+					this.apply();
+				}
+			});
+		}
+
+		static zabbix() {
+			return document.documentElement.getAttribute('theme') || 'blue-theme';
+		}
+
+		resolve() {
+			const zabbix = Theme.zabbix();
+			const dark = document.documentElement.getAttribute('color-scheme') === 'dark' || zabbix in LIGHT_OF;
+
+			if (this.mode === 'light') {
+				return dark ? (LIGHT_OF[zabbix] || 'blue-theme') : zabbix;
+			}
+
+			if (this.mode === 'dark') {
+				return dark ? zabbix : (DARK_OF[zabbix] || 'dark-theme');
+			}
+
+			return zabbix;
+		}
+
+		button() {
+			const button = iconButton('auto', t('Theme'), 'zbxagent-theme');
+
+			button.addEventListener('click', () => this.cycle());
+			this.buttons.push(button);
+			this.apply();
+
+			return button;
+		}
+
+		cycle() {
+			this.mode = THEME_MODES[(THEME_MODES.indexOf(this.mode) + 1) % THEME_MODES.length];
+			this.ui.set({theme: this.mode});
+			this.apply();
+		}
+
+		apply() {
+			const theme = this.resolve();
+			const label = {
+				auto: t('Theme: as in Zabbix'),
+				light: t('Theme: light'),
+				dark: t('Theme: dark')
+			}[this.mode] + ' · ' + t('Click to change it. Only the chat changes.');
+
+			this.roots.forEach((root) => root.setAttribute('data-theme', theme));
+			this.buttons.forEach((button) => {
+				button.innerHTML = icon({auto: 'auto', light: 'sun', dark: 'moon'}[this.mode]);
+				button.title = label;
+				button.setAttribute('aria-label', label);
+			});
+		}
+	}
+
 	/* What the user had open, so that the next page shows the same. */
 	class UiState {
 		constructor(userid) {
@@ -398,7 +482,7 @@
 
 		get() {
 			return Object.assign({open: false, size: 'normal', last: 'normal', session: '', draft: '', mode: 'ask',
-				provider: '', scroll: null}, readJson(localStorage, this.key, {}));
+				provider: '', scroll: null, theme: 'auto'}, readJson(localStorage, this.key, {}));
 		}
 
 		set(values) {
@@ -491,6 +575,10 @@
 
 			bar.append(this.sessionSelect, newButton, this.usageLabel);
 
+			if (this.host.themeButton) {
+				bar.append(this.host.themeButton);
+			}
+
 			this.remoteBar = el('div', 'zbxagent-remote',
 				t('The agent is working on this chat in another tab. You can follow it here.'));
 			this.remoteBar.hidden = true;
@@ -519,22 +607,24 @@
 
 			this.modeButton = el('button', 'zbxagent-pill zbxagent-mode');
 			this.modeButton.type = 'button';
-			this.modeButton.title = t('Shift+Tab changes the mode');
 			this.modeButton.addEventListener('click', () => this.cycleMode());
 
 			this.providerSelect = el('select', 'zbxagent-pill zbxagent-provider');
 			this.providerSelect.setAttribute('aria-label', t('Provider'));
 			this.config.providers.forEach((p) => {
-				const option = el('option', '', p.name + ' · ' + p.model);
+				const option = el('option', '', p.name);
 
 				option.value = p.id;
+				option.title = p.name + ' · ' + p.model;
 				option.selected = p.id === this.provider;
 				this.providerSelect.append(option);
 			});
+			this.updateProviderTitle();
 			this.providerSelect.hidden = this.config.providers.length === 0;
 			this.providerSelect.addEventListener('change', () => {
 				this.provider = this.providerSelect.value;
 				this.ui.set({provider: this.provider});
+				this.updateProviderTitle();
 			});
 
 			this.sendButton = el('button', 'zbxagent-send');
@@ -575,6 +665,12 @@
 					? t('There are no providers yet: add one in Settings.')
 					: t('There are no providers yet: ask an administrator to add one.'));
 			}
+		}
+
+		updateProviderTitle() {
+			const p = this.config.providers.find((candidate) => candidate.id === this.provider);
+
+			this.providerSelect.title = p ? t('Provider') + ': ' + p.name + ' · ' + p.model : t('Provider');
 		}
 
 		fitInput() {
@@ -809,14 +905,17 @@
 			this.usageLabel.textContent = u.input + u.output === 0 ? ''
 				: u.input.toLocaleString() + ' ↑ ' + u.output.toLocaleString() + ' ↓';
 			this.usageLabel.title = t('Tokens');
+			this.sessionSelect.title = (this.session.title || t('New chat'))
+				+ (u.input + u.output === 0 ? '' : ' · ' + t('Tokens') + ': ' + this.usageLabel.textContent);
 		}
 
 		updateMode() {
-			this.modeButton.textContent = {
+			this.modeButton.textContent = {ask: t('Ask'), plan: t('Plan'), auto: t('Auto')}[this.mode];
+			this.modeButton.title = t('Mode') + ': ' + {
 				ask: t('Ask before changes'),
 				plan: t('Plan (read only)'),
 				auto: t('Auto (applies changes)')
-			}[this.mode];
+			}[this.mode] + ' · ' + t('Shift+Tab changes the mode');
 			this.modeButton.className = 'zbxagent-pill zbxagent-mode is-' + this.mode;
 		}
 
@@ -1084,6 +1183,7 @@
 						this.provider = found.id;
 						this.providerSelect.value = found.id;
 						this.ui.set({provider: found.id});
+						this.updateProviderTitle();
 					}
 
 					this.system(this.config.providers.map((p) =>
@@ -1669,7 +1769,7 @@
 
 			this.launcher = el('button', 'zbxagent-launcher');
 			this.launcher.type = 'button';
-			this.launcher.innerHTML = icon('spark');
+			this.launcher.innerHTML = icon('chat');
 			this.launcher.title = t('AI agent') + ' (Ctrl+.)';
 			this.launcher.setAttribute('aria-label', t('AI agent'));
 			this.launcher.append(el('span', 'zbxagent-badge'));
@@ -1689,6 +1789,11 @@
 			title.append(this.statusLabel);
 
 			const actions = el('div', 'zbxagent-head-actions');
+
+			this.chat = el('div');
+			this.chat.id = 'zbxagent';
+			this.theme = new Theme(this.ui, [this.root, this.chat]);
+			actions.append(this.theme.button());
 
 			if (config.settings_url) {
 				const settings = iconButton('gear', t('Settings'));
@@ -1725,8 +1830,7 @@
 
 			this.body = el('div', 'zbxagent-body');
 
-			const chat = el('div');
-			chat.id = 'zbxagent';
+			const chat = this.chat;
 			this.body.append(chat);
 
 			this.panel.append(head, this.body);
@@ -1738,6 +1842,7 @@
 
 			this.root.append(this.backdrop, this.panel, this.launcher);
 			document.body.append(this.root);
+			this.followSidebar();
 
 			const ui = this.ui.get();
 
@@ -1839,6 +1944,26 @@
 
 		save() {
 			this.ui.set({open: this.isOpen, size: this.size, last: this.last});
+		}
+
+		/* The wide panel is centered in the content, next to the sidebar of Zabbix, which can be expanded or not. */
+		followSidebar() {
+			const sidebar = document.querySelector('aside.sidebar');
+			const update = () => {
+				const width = sidebar && getComputedStyle(sidebar).display !== 'none'
+					? Math.max(0, Math.round(sidebar.getBoundingClientRect().right))
+					: 0;
+
+				this.root.style.setProperty('--zbxagent-sidebar', (width > window.innerWidth / 2 ? 0 : width) + 'px');
+			};
+
+			update();
+			window.addEventListener('resize', update);
+
+			if (sidebar) {
+				new MutationObserver(update).observe(sidebar, {attributes: true, attributeFilter: ['class', 'style']});
+				sidebar.addEventListener('transitionend', update);
+			}
 		}
 
 		status(state) {
@@ -2085,7 +2210,10 @@
 			const config = JSON.parse(chat.dataset.config);
 
 			lang = config.lang || {};
-			new Agent(chat, config, {});
+
+			const theme = new Theme(new UiState(config.userid), [chat]);
+
+			new Agent(chat, config, {themeButton: theme.button()});
 			return;
 		}
 

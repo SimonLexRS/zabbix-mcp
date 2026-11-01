@@ -44,6 +44,7 @@ Un módulo de frontend para Zabbix 8 que agrega un chat agéntico **flotante en 
 | **Siempre a mano** | Botón flotante en todas las páginas. **Minimizado**, **normal** o **amplio**, y `Ctrl+.` para abrirlo o cerrarlo |
 | **Sigue al navegar** | Cambia de sección o de módulo: el chat queda como estaba, y una respuesta en curso continúa en la página siguiente |
 | **Varias pestañas** | Una pestaña ejecuta el agente; las demás lo siguen en vivo y pueden detenerlo |
+| **Colores de Zabbix** | Sigue el tema de cada usuario, en los 7 temas, y tiene su propio botón claro/oscuro |
 | **Investiga por su cuenta** | Encadena herramientas: problemas, hosts, triggers, ítems e historial |
 | **Pide aprobación** | Muestra qué va a cambiar, y solo lo hace si lo permites |
 | **Tres modos** | *Preguntar*, *Plan* (solo lectura) y *Auto*. Se alternan con `Shift+Tab` |
@@ -56,6 +57,8 @@ Un módulo de frontend para Zabbix 8 que agrega un chat agéntico **flotante en 
 | Normal, junto a Zabbix | Minimizado | Tema oscuro |
 |---|---|---|
 | ![Normal](docs/screenshots/dock-normal.png) | ![Minimizado](docs/screenshots/dock-min.png) | ![Oscuro](docs/screenshots/dock-dark.png) |
+| **Tema Dark blue** | **Alto contraste oscuro** | **En español** |
+| ![Dark blue](docs/screenshots/theme-dark-blue.png) | ![Alto contraste](docs/screenshots/theme-hc-dark.png) | ![Español](docs/screenshots/dock-es.png) |
 | **Otra pestaña lo sigue en vivo** | **Esperando tu aprobación** | **Teléfono** |
 | ![Otra pestaña](docs/screenshots/dock-other-tab.png) | ![Aprobación](docs/screenshots/approval.png) | ![Teléfono](docs/screenshots/dock-mobile.png) |
 
@@ -89,12 +92,12 @@ Lee los [riesgos y responsabilidades](docs/guia-ubuntu-paso-a-paso.md#seguridad)
 | Guía ejecutada con sus propios comandos | Ubuntu 26.10 ARM64, Zabbix 8.0.0rc3 compilado desde fuente |
 | Conversaciones reales | DeepSeek en sus API compatibles con OpenAI y con Anthropic, con datos reales |
 | Navegador real (Chromium) | Streaming, herramientas, aprobar y rechazar, plan, detener, `/compact`, móvil y un intento de inyectar HTML |
-| Chat flotante (Chromium) | Tres tamaños, `Ctrl+.` y `Esc`; sigue abierto entre secciones; una respuesta continúa tras cambiar de página; una aprobación vuelve tras cambiar de página y un rechazo no cambia nada; una segunda pestaña lo sigue en solo lectura y lo retoma al cerrar la primera; teléfono; sin chat en modo kiosco |
+| Chat flotante (Chromium) | Tres tamaños, `Ctrl+.` y `Esc`; sigue abierto entre secciones; una respuesta continúa tras cambiar de página; una aprobación vuelve tras cambiar de página y un rechazo no cambia nada; una segunda pestaña lo sigue en solo lectura y lo retoma al cerrar la primera; teléfono; sin chat en modo kiosco; los 7 temas y el botón claro/oscuro; textos en español sin cortar; panel amplio junto a la barra lateral |
 | Permisos | Un usuario sin acceso recibe el error de la API, y no puede abrir los ajustes |
 | Tests y CI | Conversión de mensajes, streams, cifrado y traducciones |
 
 > [!NOTE]
-> **Sin comprobar:** AMD64, Ubuntu 26.04, Zabbix por paquetes, Apache, y las API propias de OpenAI y Anthropic. La interfaz en español no se vio en pantalla, y el tema oscuro se vio cambiando la hoja de estilos, no con el ajuste del usuario. El chat flotante se probó con sus archivos nuevos y `agent.config` servidos desde la copia de trabajo, antes de instalarlos en el servidor.
+> **Sin comprobar:** AMD64, Ubuntu 26.04, Zabbix por paquetes, Apache, y las API propias de OpenAI y Anthropic. Los temas se probaron cambiando el tema en el HTML que envía Zabbix, no en el perfil del usuario, y los textos en español cargando su catálogo en el chat. No se probó en Safari. El chat flotante se probó con sus archivos nuevos y `agent.config` servidos desde la copia de trabajo, antes de instalarlos en el servidor.
 
 ## Qué incluye
 

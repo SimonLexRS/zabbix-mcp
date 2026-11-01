@@ -1,63 +1,126 @@
 /*
  * AI agent. Everything is under #zbxagent (the chat) or #zbxagent-dock (the floating panel), so that the styles of
  * Zabbix for buttons, selects and text areas do not reach the chat, and the chat does not reach Zabbix.
+ *
+ * The colors are those of each Zabbix theme, taken from its own stylesheet: dialogs, tables, inputs, buttons, links
+ * and status colors. The chat writes the theme it uses in data-theme: the one of Zabbix, or the one chosen with its
+ * light/dark button.
  */
 
 #zbxagent,
 #zbxagent-dock {
-	--agent-bg: #faf9f5;
-	--agent-raised: #ffffff;
-	--agent-soft: #f0eee6;
-	--agent-hover: #e9e6dc;
-	--agent-line: #e2ded3;
-	--agent-strong-line: #cdc8bb;
-	--agent-text: #1f1e1d;
-	--agent-muted: #6e6b63;
-	--agent-accent: #c96442;
-	--agent-accent-strong: #ad5132;
-	--agent-accent-soft: #f6e8e1;
+	/* Blue, the default theme of Zabbix, and Blue classic. */
+	--agent-bg: #ffffff;
+	--agent-soft: #ebeef0;
+	--agent-line: #dfe4e7;
+	--agent-strong-line: #acbbc2;
+	--agent-text: #1f2c33;
+	--agent-muted: #768d99;
+	--agent-accent: #0275b8;
 	--agent-on-accent: #ffffff;
-	--agent-user: #efece3;
-	--agent-code: #f1efe8;
-	--agent-ok: #3f8f5a;
-	--agent-warn: #b26a12;
-	--agent-error: #c0392b;
-	--agent-info: #3a6ea5;
-	--agent-backdrop: rgba(31, 30, 29, .28);
-	--agent-shadow: 0 1px 2px rgba(31, 30, 29, .06), 0 12px 40px rgba(31, 30, 29, .16);
-	--agent-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
-	--agent-serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+	--agent-link: #0275b8;
+	--agent-ok: #429e47;
+	--agent-warn: #f24f1d;
+	--agent-error: #e33734;
+	--agent-raised: var(--agent-bg);
+	--agent-user: var(--agent-soft);
+	--agent-code: var(--agent-soft);
+	--agent-shadow-color: rgba(118, 141, 153, .5);
+	--agent-backdrop: rgba(31, 44, 51, .3);
+	--agent-font: var(--font-stack, Arial, sans-serif);
 	--agent-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+	--agent-hover: color-mix(in srgb, var(--agent-accent) 9%, var(--agent-bg));
+	--agent-accent-soft: color-mix(in srgb, var(--agent-accent) 14%, var(--agent-bg));
+	--agent-accent-strong: color-mix(in srgb, var(--agent-accent) 82%, var(--agent-text));
+	--agent-info: var(--agent-link);
+	--agent-shadow: 0 4px 20px 0 var(--agent-shadow-color);
 	color: var(--agent-text);
 	font-family: var(--agent-font);
-	font-size: 13.5px;
+	font-size: 13px;
 	line-height: 1.5;
+	color-scheme: light;
 }
 
-html[theme="dark-theme"] #zbxagent,
-html[theme="dark-theme"] #zbxagent-dock,
-html[theme="hc-dark"] #zbxagent,
-html[theme="hc-dark"] #zbxagent-dock {
-	--agent-bg: #262624;
-	--agent-raised: #30302e;
-	--agent-soft: #30302e;
-	--agent-hover: #3a3936;
-	--agent-line: #3f3e3a;
-	--agent-strong-line: #55534d;
-	--agent-text: #f2f0ea;
-	--agent-muted: #a8a59c;
-	--agent-accent: #d97757;
-	--agent-accent-strong: #e8906f;
-	--agent-accent-soft: #3d2c25;
+#zbxagent[data-theme="dark-theme"],
+#zbxagent-dock[data-theme="dark-theme"],
+#zbxagent[data-theme="dark-classic-theme"],
+#zbxagent-dock[data-theme="dark-classic-theme"] {
+	--agent-bg: #2b2b2b;
+	--agent-soft: #383838;
+	--agent-line: #383838;
+	--agent-strong-line: #4f4f4f;
+	--agent-text: #f2f2f2;
+	--agent-muted: #9aa7b0;
+	--agent-accent: #69808d;
+	--agent-on-accent: #f2f2f2;
+	--agent-link: #4796c4;
+	--agent-ok: #59db8f;
+	--agent-warn: #f24f1d;
+	--agent-error: #e45959;
+	--agent-code: #0e1012;
+	--agent-shadow-color: rgba(0, 0, 0, .5);
+	--agent-backdrop: rgba(0, 0, 0, .5);
+	--agent-hover: #383838;
+	color-scheme: dark;
+}
+
+#zbxagent[data-theme="dark-blue-theme"],
+#zbxagent-dock[data-theme="dark-blue-theme"] {
+	--agent-bg: #001f42;
+	--agent-soft: #001833;
+	--agent-line: #003a7a;
+	--agent-strong-line: #0066d9;
+	--agent-text: #e5f1ff;
+	--agent-muted: #939ca4;
+	--agent-accent: #0066d9;
+	--agent-on-accent: #e5f1ff;
+	--agent-link: #3d98ff;
+	--agent-ok: #10b981;
+	--agent-warn: #f24f1d;
+	--agent-error: #ff5555;
+	--agent-shadow-color: rgba(0, 0, 0, .5);
+	--agent-backdrop: rgba(0, 10, 24, .55);
+	color-scheme: dark;
+}
+
+#zbxagent[data-theme="hc-light"],
+#zbxagent-dock[data-theme="hc-light"] {
+	--agent-bg: #ffffff;
+	--agent-soft: #f2f2f2;
+	--agent-line: #9f9f9f;
+	--agent-strong-line: #888888;
+	--agent-text: #000000;
+	--agent-muted: #333333;
+	--agent-accent: #555555;
 	--agent-on-accent: #ffffff;
-	--agent-user: #1d1d1b;
-	--agent-code: #1d1d1b;
-	--agent-ok: #7cc48e;
-	--agent-warn: #e0a458;
-	--agent-error: #f08a7a;
-	--agent-info: #8ab4e8;
-	--agent-backdrop: rgba(0, 0, 0, .45);
-	--agent-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 48px rgba(0, 0, 0, .45);
+	--agent-link: #000000;
+	--agent-ok: #009900;
+	--agent-warn: #f24f1d;
+	--agent-error: #990000;
+	--agent-shadow-color: rgba(0, 0, 0, .5);
+	--agent-backdrop: rgba(0, 0, 0, .4);
+	color-scheme: light;
+}
+
+#zbxagent[data-theme="hc-dark"],
+#zbxagent-dock[data-theme="hc-dark"] {
+	--agent-bg: #000000;
+	--agent-soft: #111111;
+	--agent-line: #444444;
+	--agent-strong-line: #666666;
+	--agent-text: #ffffff;
+	--agent-muted: #cacaca;
+	--agent-accent: #e0e0e0;
+	--agent-on-accent: #333333;
+	--agent-link: #f8f8f8;
+	--agent-ok: #23d545;
+	--agent-warn: #ff7800;
+	--agent-error: #ff5050;
+	--agent-code: #111111;
+	--agent-shadow-color: rgba(0, 0, 0, .5);
+	--agent-backdrop: rgba(0, 0, 0, .6);
+	--agent-hover: #222222;
+	color-scheme: dark;
 }
 
 #zbxagent *,
@@ -87,6 +150,8 @@ html[theme="hc-dark"] #zbxagent-dock {
 	line-height: inherit;
 	text-align: inherit;
 	cursor: pointer;
+	-webkit-appearance: none;
+	appearance: none;
 }
 
 #zbxagent button:focus,
@@ -192,6 +257,7 @@ html[theme="hc-dark"] #zbxagent-dock {
 	flex-direction: column;
 	width: 420px;
 	height: min(660px, calc(100vh - 44px));
+	height: min(660px, calc(100dvh - 44px));
 	overflow: hidden;
 	border: 1px solid var(--agent-line);
 	border-radius: 16px;
@@ -199,13 +265,15 @@ html[theme="hc-dark"] #zbxagent-dock {
 	box-shadow: var(--agent-shadow);
 }
 
+/* Centered in the content of Zabbix, to the right of its sidebar. */
 #zbxagent-dock[data-size="wide"] .zbxagent-panel {
 	top: 50%;
-	left: 50%;
+	left: calc(var(--zbxagent-sidebar, 0px) + (100vw - var(--zbxagent-sidebar, 0px)) / 2);
 	right: auto;
 	bottom: auto;
-	width: min(1120px, 88vw);
-	height: 86vh;
+	width: min(1120px, calc((100vw - var(--zbxagent-sidebar, 0px)) * .92));
+	height: min(86vh, calc(100vh - 32px));
+	height: min(86dvh, calc(100dvh - 32px));
 	transform: translate(-50%, -50%);
 }
 
@@ -255,7 +323,7 @@ html[theme="hc-dark"] #zbxagent-dock {
 }
 
 #zbxagent-dock.is-busy .zbxagent-mark svg {
-	animation: zbxagent-spin 2.4s linear infinite;
+	animation: zbxagent-blink 1.4s ease-in-out infinite;
 }
 
 #zbxagent-dock .zbxagent-title {
@@ -348,15 +416,30 @@ html[theme="hc-dark"] #zbxagent-dock {
 	border-bottom: 1px solid var(--agent-line);
 }
 
+/* Selects look the same in every browser: no native control, an arrow drawn in the color of the text. */
 #zbxagent select {
+	-webkit-appearance: none;
+	appearance: none;
 	height: 28px;
-	padding: 0 8px;
+	margin: 0;
+	padding: 0 26px 0 10px;
+	overflow: hidden;
 	border: 1px solid var(--agent-line);
 	border-radius: 8px;
 	background-color: var(--agent-bg);
+	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position: right 13px center, right 9px center;
+	background-size: 4px 4px, 4px 4px;
+	background-repeat: no-repeat;
+	box-shadow: none;
 	color: var(--agent-text);
 	font: inherit;
 	font-size: 12.5px;
+	line-height: 26px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
 }
 
 #zbxagent select option {
@@ -396,6 +479,11 @@ html[theme="hc-dark"] #zbxagent-dock {
 #zbxagent .zbxagent-new svg {
 	width: 14px;
 	height: 14px;
+}
+
+/* In the normal size the tokens are in the tooltip of the chat title. */
+#zbxagent-dock[data-size="normal"] .zbxagent-usage {
+	display: none;
 }
 
 #zbxagent .zbxagent-usage {
@@ -463,8 +551,8 @@ html[theme="hc-dark"] #zbxagent-dock {
 
 #zbxagent .zbxagent-welcome strong {
 	margin-bottom: 8px;
-	font-family: var(--agent-serif);
-	font-size: 22px;
+	font-family: var(--agent-font);
+	font-size: 18px;
 	font-weight: 400;
 }
 
@@ -500,9 +588,9 @@ html[theme="hc-dark"] #zbxagent-dock {
 
 #zbxagent .zbxagent-assistant {
 	margin: 10px 0;
-	font-family: var(--agent-serif);
-	font-size: 15px;
-	line-height: 1.65;
+	font-family: var(--agent-font);
+	font-size: 13.5px;
+	line-height: 1.6;
 }
 
 #zbxagent .zbxagent-assistant.is-live {
@@ -880,11 +968,17 @@ html[theme="hc-dark"] #zbxagent-dock {
 	overflow: hidden;
 	border: 1px solid var(--agent-line);
 	border-radius: 999px;
-	background: transparent;
+	background-color: transparent;
 	color: var(--agent-muted);
 	font-size: 12px;
+	line-height: 24px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+#zbxagent select.zbxagent-pill {
+	padding-right: 24px;
+	background-position: right 12px center, right 8px center;
 }
 
 #zbxagent .zbxagent-pill:hover {
@@ -1025,6 +1119,7 @@ html[theme="hc-dark"] #zbxagent-dock {
 		inset: 0;
 		width: 100%;
 		height: 100%;
+		height: 100dvh;
 		border: 0;
 		border-radius: 0;
 		transform: none;

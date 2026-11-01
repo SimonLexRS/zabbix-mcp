@@ -107,4 +107,12 @@ return [
 	'Waiting for your approval' => 'Esperando tu aprobación',
 	'Wide' => 'Amplio',
 	'Working in another tab' => 'Trabajando en otra pestaña',
+	'Ask' => 'Preguntar',
+	'Plan' => 'Plan',
+	'Auto' => 'Auto',
+	'Theme' => 'Tema',
+	'Theme: as in Zabbix' => 'Tema: como en Zabbix',
+	'Theme: light' => 'Tema: claro',
+	'Theme: dark' => 'Tema: oscuro',
+	'Click to change it. Only the chat changes.' => 'Pulsa para cambiarlo. Solo cambia el chat.',
 ];
