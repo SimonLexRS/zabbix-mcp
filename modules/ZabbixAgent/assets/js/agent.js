@@ -1,12 +1,22 @@
 /*
  * AI agent: the chat of the module. The browser drives the agent: it asks the server for one turn of the model, runs the
  * tools that turn requests, asks the user to approve changes, and goes on until the model stops calling tools.
+ *
+ * The chat floats on every page of Zabbix. Zabbix loads a new page on each navigation, so every step is saved in this
+ * browser and the next page goes on from the last saved step. One tab runs the agent at a time; the others follow it.
  */
 (function () {
 	'use strict';
 
 	const MODES = ['ask', 'plan', 'auto'];
+	const SIZES = ['min', 'normal', 'wide'];
 	const SESSIONS_KEPT = 30;
+	const LOCK_TTL = 6000;
+	const HANDOFF_MS = 3000;
+	const RESUME_WINDOW = 30 * 60 * 1000;
+	const TOOLS_TTL = 10 * 60 * 1000;
+	const UNCERTAIN = 'Interrupted while it was being applied: it is not known whether this change was applied.'
+		+ ' Check the current state before trying it again.';
 
 	const LOCAL_TOOLS = [
 		{
@@ -41,8 +51,43 @@
 		}
 	];
 
+	/* Icons drawn for this module, inline so they follow the color of the text. */
+	const ICONS = {
+		spark: '<path d="M12 2.5l2.1 6.6 6.4 2.9-6.4 2.9L12 21.5l-2.1-6.6L3.5 12l6.4-2.9z" fill="currentColor" stroke="none"/>',
+		plus: '<path d="M12 5v14M5 12h14"/>',
+		up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+		stop: '<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/>',
+		min: '<path d="M6 12h12"/>',
+		normal: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+		wide: '<path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/>',
+		narrow: '<path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5"/>',
+		close: '<path d="M6 6l12 12M18 6L6 18"/>',
+		gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
+		page: '<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'
+	};
+
 	let lang = {};
 	const t = (text) => lang[text] || text;
+
+	const randomId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+	/* The same browser tab keeps its id from one page of Zabbix to the next; each page has its own. */
+	const PAGE = randomId();
+	const TAB = (() => {
+		try {
+			let id = sessionStorage.getItem('zbxagent.tab');
+
+			if (!id) {
+				id = randomId();
+				sessionStorage.setItem('zbxagent.tab', id);
+			}
+
+			return id;
+		}
+		catch (e) {
+			return PAGE;
+		}
+	})();
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -56,6 +101,43 @@
 		}
 
 		return node;
+	}
+
+	function icon(name) {
+		return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"'
+			+ ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ICONS[name] + '</svg>';
+	}
+
+	function iconButton(name, label, className) {
+		const button = el('button', 'zbxagent-icon' + (className ? ' ' + className : ''));
+
+		button.type = 'button';
+		button.innerHTML = icon(name);
+		button.title = label;
+		button.setAttribute('aria-label', label);
+
+		return button;
+	}
+
+	function readJson(storage, key, fallback) {
+		try {
+			const value = JSON.parse(storage.getItem(key));
+
+			return value === null ? fallback : value;
+		}
+		catch (e) {
+			return fallback;
+		}
+	}
+
+	function writeJson(storage, key, value) {
+		try {
+			storage.setItem(key, JSON.stringify(value));
+			return true;
+		}
+		catch (e) {
+			return false;
+		}
 	}
 
 	function post(action, token, csrfName, payload, signal) {
@@ -126,6 +208,10 @@
 				i--;
 				html.push(rows.join('') + '</tbody></table></div>');
 			}
+			else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+				closeList();
+				html.push('<hr>');
+			}
 			else if ((m = line.match(/^(#{1,4})\s+(.*)/))) {
 				closeList();
 				html.push('<h' + (m[1].length + 2) + '>' + inline(m[2]) + '</h' + (m[1].length + 2) + '>');
@@ -163,25 +249,16 @@
 		}
 
 		load() {
-			try {
-				return JSON.parse(localStorage.getItem(this.key)) || [];
-			}
-			catch (e) {
-				return [];
-			}
+			const sessions = readJson(localStorage, this.key, []);
+
+			return Array.isArray(sessions) ? sessions : [];
 		}
 
 		save(sessions) {
 			let kept = sessions.slice(0, SESSIONS_KEPT);
 
-			while (kept.length > 0) {
-				try {
-					localStorage.setItem(this.key, JSON.stringify(kept));
-					return;
-				}
-				catch (e) {
-					kept = kept.slice(0, -1);
-				}
+			while (kept.length > 0 && !writeJson(localStorage, this.key, kept)) {
+				kept = kept.slice(0, -1);
 			}
 		}
 
@@ -195,27 +272,204 @@
 		}
 	}
 
+	/*
+	 * Only one page runs the agent at a time. The page that runs it renews this lock every 2 s. When it leaves, it marks
+	 * the lock as released: the next page of the same tab takes it at once, and any other tab after a few seconds.
+	 */
+	class Lock {
+		constructor(userid) {
+			this.key = 'zbxagent.' + userid + '.lock';
+			this.timer = null;
+			this.session = null;
+		}
+
+		read() {
+			return readJson(localStorage, this.key, null);
+		}
+
+		mine() {
+			const lock = this.read();
+
+			return lock !== null && lock.page === PAGE;
+		}
+
+		canTake() {
+			const lock = this.read();
+
+			if (lock === null || lock.page === PAGE) {
+				return true;
+			}
+
+			const age = Date.now() - lock.ts;
+
+			return lock.released ? (lock.tab === TAB || age > HANDOFF_MS) : age > LOCK_TTL;
+		}
+
+		/* The id of the chat that another page is running, or null. */
+		elsewhere() {
+			const lock = this.read();
+
+			return lock !== null && lock.page !== PAGE && !lock.released && Date.now() - lock.ts <= LOCK_TTL
+				? lock.session
+				: null;
+		}
+
+		async take(session) {
+			if (!this.canTake()) {
+				return false;
+			}
+
+			this.session = session;
+			this.beat();
+
+			// Two tabs can try at once: the last one that wrote keeps it.
+			await new Promise((resolve) => setTimeout(resolve, 80));
+
+			if (!this.mine()) {
+				return false;
+			}
+
+			this.timer = setInterval(() => this.beat(), 2000);
+
+			return true;
+		}
+
+		beat() {
+			writeJson(localStorage, this.key, {tab: TAB, page: PAGE, session: this.session, ts: Date.now()});
+		}
+
+		release(handoff) {
+			clearInterval(this.timer);
+			this.timer = null;
+
+			if (!this.mine()) {
+				return;
+			}
+
+			if (handoff) {
+				writeJson(localStorage, this.key, {tab: TAB, page: PAGE, session: this.session, ts: Date.now(),
+					released: true});
+			}
+			else {
+				try {
+					localStorage.removeItem(this.key);
+				}
+				catch (e) {
+					// Nothing to release.
+				}
+			}
+		}
+	}
+
+	/* Messages between the pages of this user that are open in this browser: live text and stop requests. */
+	class Bus {
+		constructor(userid, handler) {
+			this.key = 'zbxagent.' + userid + '.bus';
+			this.channel = null;
+
+			if (typeof BroadcastChannel === 'function') {
+				this.channel = new BroadcastChannel(this.key);
+				this.channel.onmessage = (e) => handler(e.data);
+			}
+			else {
+				window.addEventListener('storage', (e) => {
+					if (e.key === this.key && e.newValue) {
+						handler(readJson(localStorage, this.key, {}).message);
+					}
+				});
+			}
+		}
+
+		send(message) {
+			if (this.channel) {
+				this.channel.postMessage(message);
+			}
+			else {
+				writeJson(localStorage, this.key, {message, n: randomId()});
+			}
+		}
+	}
+
+	/* What the user had open, so that the next page shows the same. */
+	class UiState {
+		constructor(userid) {
+			this.key = 'zbxagent.' + userid + '.ui';
+		}
+
+		get() {
+			return Object.assign({open: false, size: 'normal', last: 'normal', session: '', draft: '', mode: 'ask',
+				provider: '', scroll: null}, readJson(localStorage, this.key, {}));
+		}
+
+		set(values) {
+			writeJson(localStorage, this.key, Object.assign(this.get(), values));
+		}
+	}
+
 	class Agent {
-		constructor(root, config) {
+		/**
+		 * @param {HTMLElement} root    Where the chat is built.
+		 * @param {Object}      config  From the server.
+		 * @param {Object}      host    The page or the floating panel: status(state), escape(), visible().
+		 */
+		constructor(root, config, host) {
 			this.root = root;
 			this.config = config;
+			this.host = host || {};
 			this.store = new Store(config.userid);
+			this.lock = new Lock(config.userid);
+			this.ui = new UiState(config.userid);
+			this.bus = new Bus(config.userid, (message) => this.onMessage(message));
 			this.sessions = this.store.load();
 			this.session = null;
-			this.tools = [];
+			this.tools = null;
 			this.running = false;
+			this.remote = null;
+			this.unloading = false;
 			this.abort = null;
 			this.pending = null;
-			this.mode = 'ask';
-			this.provider = config.default_provider;
+			this.liveNode = null;
+			this.liveSent = 0;
+
+			const ui = this.ui.get();
+
+			this.mode = MODES.includes(ui.mode) ? ui.mode : 'ask';
+			this.provider = config.providers.some((p) => p.id === ui.provider) ? ui.provider : config.default_provider;
 
 			this.build();
-			this.newSession();
-			this.loadTools();
+
+			const saved = this.sessions.find((s) => s.id === ui.session);
+
+			if (saved) {
+				this.session = saved;
+				this.renderSession();
+
+				if (ui.scroll !== null) {
+					this.log.scrollTop = ui.scroll;
+				}
+			}
+			else {
+				// A chat with no messages yet is not stored: keep its id, so that every tab shows the same one.
+				this.newSession(ui.session);
+			}
+
+			this.input.value = ui.draft || '';
+			this.fitInput();
+
+			window.addEventListener('pagehide', () => this.leave());
+			window.addEventListener('storage', (e) => this.onStorage(e));
+			setInterval(() => this.tick(), 2000);
+			this.tick();
 		}
 
 		call(action, token, payload, signal) {
 			return post(action, token, this.config.csrf_name, payload, signal);
+		}
+
+		status(state) {
+			if (this.host.status) {
+				this.host.status(state);
+			}
 		}
 
 		/* Interface */
@@ -223,26 +477,23 @@
 		build() {
 			const bar = el('div', 'zbxagent-bar');
 
-			this.providerSelect = el('select');
-			this.config.providers.forEach((p) => {
-				const option = el('option', '', p.name + ' · ' + p.model);
-
-				option.value = p.id;
-				option.selected = p.id === this.provider;
-				this.providerSelect.append(option);
-			});
-			this.providerSelect.addEventListener('change', () => { this.provider = this.providerSelect.value; });
-
-			this.sessionSelect = el('select');
+			this.sessionSelect = el('select', 'zbxagent-sessions');
+			this.sessionSelect.setAttribute('aria-label', t('Chats'));
 			this.sessionSelect.addEventListener('change', () => this.openSession(this.sessionSelect.value));
 
-			const newButton = el('button', 'btn-alt', t('New chat'));
+			const newButton = el('button', 'zbxagent-new');
 			newButton.type = 'button';
+			newButton.innerHTML = icon('plus');
+			newButton.append(el('span', '', t('New chat')));
 			newButton.addEventListener('click', () => this.newSession());
 
 			this.usageLabel = el('span', 'zbxagent-usage');
 
-			bar.append(this.sessionSelect, newButton, this.providerSelect, this.usageLabel);
+			bar.append(this.sessionSelect, newButton, this.usageLabel);
+
+			this.remoteBar = el('div', 'zbxagent-remote',
+				t('The agent is working on this chat in another tab. You can follow it here.'));
+			this.remoteBar.hidden = true;
 
 			this.todosBox = el('div', 'zbxagent-todos');
 			this.todosBox.hidden = true;
@@ -255,39 +506,89 @@
 			this.palette.hidden = true;
 
 			this.input = el('textarea', 'zbxagent-input');
-			this.input.rows = 2;
+			this.input.rows = 1;
 			this.input.placeholder = t('Ask about your monitoring, or type / for commands');
 			this.input.setAttribute('aria-label', t('Message'));
 			this.input.addEventListener('keydown', (e) => this.onKey(e));
-			this.input.addEventListener('input', () => this.updatePalette());
+			this.input.addEventListener('input', () => {
+				this.updatePalette();
+				this.fitInput();
+				clearTimeout(this.draftTimer);
+				this.draftTimer = setTimeout(() => this.ui.set({draft: this.input.value}), 300);
+			});
 
-			this.sendButton = el('button', 'zbxagent-send', t('Send'));
-			this.sendButton.type = 'button';
-			this.sendButton.addEventListener('click', () => this.running ? this.stop() : this.submit());
-
-			const row = el('div', 'zbxagent-compose');
-			row.append(this.input, this.sendButton);
-
-			this.modeButton = el('button', 'zbxagent-mode');
+			this.modeButton = el('button', 'zbxagent-pill zbxagent-mode');
 			this.modeButton.type = 'button';
+			this.modeButton.title = t('Shift+Tab changes the mode');
 			this.modeButton.addEventListener('click', () => this.cycleMode());
 
-			this.hint = el('span', 'zbxagent-hint', t('Shift+Tab changes the mode · Enter sends · Shift+Enter adds a line'));
+			this.providerSelect = el('select', 'zbxagent-pill zbxagent-provider');
+			this.providerSelect.setAttribute('aria-label', t('Provider'));
+			this.config.providers.forEach((p) => {
+				const option = el('option', '', p.name + ' · ' + p.model);
 
-			const foot = el('div', 'zbxagent-foot');
-			foot.append(this.modeButton, this.hint);
+				option.value = p.id;
+				option.selected = p.id === this.provider;
+				this.providerSelect.append(option);
+			});
+			this.providerSelect.hidden = this.config.providers.length === 0;
+			this.providerSelect.addEventListener('change', () => {
+				this.provider = this.providerSelect.value;
+				this.ui.set({provider: this.provider});
+			});
 
-			const notice = el('div', 'zbxagent-notice',
+			this.sendButton = el('button', 'zbxagent-send');
+			this.sendButton.type = 'button';
+			this.sendButton.addEventListener('click', () => {
+				if (this.running) {
+					this.stop();
+				}
+				else if (this.remote) {
+					this.bus.send({type: 'stop', session: this.remote});
+				}
+				else {
+					this.submit();
+				}
+			});
+
+			const tools = el('div', 'zbxagent-compose-tools');
+			tools.append(this.modeButton, this.providerSelect, el('span', 'zbxagent-spacer'), this.sendButton);
+
+			const composer = el('div', 'zbxagent-compose');
+			composer.append(this.palette, this.input, tools);
+			composer.addEventListener('click', (e) => {
+				if (e.target === composer) {
+					this.input.focus();
+				}
+			});
+
+			const foot = el('div', 'zbxagent-foot',
 				t('What the tools return, including values and internal addresses, is sent to the selected provider.'));
+			foot.title = t('Shift+Tab changes the mode · Enter sends · Shift+Enter adds a line');
 
-			this.root.append(bar, notice, this.todosBox, this.log, this.palette, row, foot);
+			this.root.append(bar, this.remoteBar, this.todosBox, this.log, composer, foot);
 			this.updateMode();
+			this.updateSend();
 
 			if (this.config.providers.length === 0) {
 				this.system(this.config.is_admin
 					? t('There are no providers yet: add one in Settings.')
 					: t('There are no providers yet: ask an administrator to add one.'));
 			}
+		}
+
+		fitInput() {
+			this.input.style.height = 'auto';
+			this.input.style.height = Math.min(this.input.scrollHeight, 220) + 'px';
+		}
+
+		updateSend() {
+			const stop = this.running || this.remote !== null;
+
+			this.sendButton.innerHTML = icon(stop ? 'stop' : 'up');
+			this.sendButton.title = stop ? t('Stop') : t('Send');
+			this.sendButton.setAttribute('aria-label', this.sendButton.title);
+			this.sendButton.classList.toggle('is-stop', stop);
 		}
 
 		refreshSessions() {
@@ -303,20 +604,22 @@
 			this.sessionSelect.value = this.session.id;
 		}
 
-		newSession() {
+		newSession(id) {
 			if (this.running) {
 				return;
 			}
 
 			this.session = {
-				id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+				id: id || randomId(),
 				title: '',
 				messages: [],
 				todos: [],
 				allowed: [],
 				usage: {input: 0, output: 0, last: 0}
 			};
+			this.ui.set({session: this.session.id, scroll: null});
 			this.renderSession();
+			this.tick();
 		}
 
 		openSession(id) {
@@ -324,16 +627,23 @@
 
 			if (session && !this.running) {
 				this.session = session;
+				this.ui.set({session: id, scroll: null});
 				this.renderSession();
+				this.tick();
 			}
 		}
 
+		/* Other pages save too: start from what is stored, so that nothing of theirs is lost. */
 		persist() {
 			if (this.session.messages.length === 0) {
 				return;
 			}
 
-			this.sessions = [this.session].concat(this.sessions.filter((s) => s.id !== this.session.id));
+			if (this.session.run) {
+				this.session.run.ts = Date.now();
+			}
+
+			this.sessions = [this.session].concat(this.store.load().filter((s) => s.id !== this.session.id));
 			this.store.save(this.sessions);
 			this.refreshSessions();
 		}
@@ -341,6 +651,7 @@
 		renderSession() {
 			this.log.textContent = '';
 			this.toolBlocks = {};
+			this.liveNode = null;
 			this.renderTodos();
 			this.renderUsage();
 			this.refreshSessions();
@@ -374,15 +685,17 @@
 
 		welcome() {
 			const box = el('div', 'zbxagent-welcome');
+			const mark = el('div', 'zbxagent-welcome-mark');
 
-			box.append(el('strong', '', t('What do you want to look at?')));
+			mark.innerHTML = icon('spark');
+			box.append(mark, el('strong', '', t('What do you want to look at?')));
 
 			[
 				t('Which problems are active, and what do they have in common?'),
 				t('Which hosts are unavailable, and since when?'),
 				t('Review the maintenance periods and tell me which ones are active.')
 			].forEach((question) => {
-				const button = el('button', '', question);
+				const button = el('button', 'zbxagent-suggestion', question);
 
 				button.type = 'button';
 				button.addEventListener('click', () => {
@@ -409,9 +722,10 @@
 		}
 
 		addUser(text) {
-			const node = el('div', 'zbxagent-user', text);
+			const row = el('div', 'zbxagent-user-row');
 
-			this.log.append(node);
+			row.append(el('div', 'zbxagent-user', text));
+			this.log.append(row);
 			this.scroll();
 		}
 
@@ -436,7 +750,7 @@
 		addTool(call) {
 			const details = el('details', 'zbxagent-tool');
 			const summary = el('summary');
-			const state = el('span', 'zbxagent-tool-state', '●');
+			const state = el('span', 'zbxagent-tool-state');
 			const name = el('span', 'zbxagent-tool-name', call.name);
 			const brief = el('span', 'zbxagent-tool-brief', this.brief(call.arguments));
 			const time = el('span', 'zbxagent-tool-time');
@@ -492,30 +806,140 @@
 		renderUsage() {
 			const u = this.session.usage;
 
-			this.usageLabel.textContent = t('Tokens') + ': ' + u.input.toLocaleString() + ' ↑ '
-				+ u.output.toLocaleString() + ' ↓';
+			this.usageLabel.textContent = u.input + u.output === 0 ? ''
+				: u.input.toLocaleString() + ' ↑ ' + u.output.toLocaleString() + ' ↓';
+			this.usageLabel.title = t('Tokens');
 		}
 
 		updateMode() {
-			this.modeButton.textContent = t('Mode') + ': ' + {
+			this.modeButton.textContent = {
 				ask: t('Ask before changes'),
 				plan: t('Plan (read only)'),
 				auto: t('Auto (applies changes)')
 			}[this.mode];
-			this.modeButton.className = 'zbxagent-mode is-' + this.mode;
+			this.modeButton.className = 'zbxagent-pill zbxagent-mode is-' + this.mode;
 		}
 
 		cycleMode() {
 			this.mode = MODES[(MODES.indexOf(this.mode) + 1) % MODES.length];
+			this.ui.set({mode: this.mode});
 			this.updateMode();
 		}
 
 		setRunning(running) {
 			this.running = running;
-			this.sendButton.textContent = running ? t('Stop') : t('Send');
-			this.sendButton.classList.toggle('is-stop', running);
+			this.updateSend();
 			this.providerSelect.disabled = running;
 			this.sessionSelect.disabled = running;
+
+			if (!running) {
+				this.status('idle');
+			}
+		}
+
+		/* Another page runs this chat: follow it, and allow only stopping it. */
+		setRemote(session) {
+			const remote = session !== null && session === this.session.id ? session : null;
+			const busy = session !== null;
+
+			this.remoteBar.hidden = remote === null;
+			this.input.disabled = remote !== null;
+
+			if (remote !== this.remote) {
+				this.remote = remote;
+				this.updateSend();
+			}
+
+			if (!this.running) {
+				this.status(busy ? 'remote' : 'idle');
+			}
+		}
+
+		/* Every 2 s and when something changes: who runs the agent, and whether this page must go on with it. */
+		tick() {
+			if (this.running || this.unloading) {
+				return;
+			}
+
+			this.setRemote(this.lock.elsewhere());
+
+			const run = this.session.run;
+
+			if (!run || this.remote !== null || this.starting) {
+				return;
+			}
+
+			if (Date.now() - (run.ts || 0) > RESUME_WINDOW) {
+				const executing = run.executing;
+
+				delete this.session.run;
+				this.closeOpenCalls(t('Interrupted: the page was closed before this finished.'), executing);
+				this.persist();
+				return;
+			}
+
+			if (this.lock.canTake()) {
+				this.run(true);
+			}
+		}
+
+		onStorage(e) {
+			if (e.key === this.ui.key && !this.running && this.session.messages.length === 0) {
+				const ui = this.ui.get();
+
+				// Another tab started a new chat while this one shows an empty one: show the same.
+				if (ui.session && ui.session !== this.session.id) {
+					const saved = this.store.load().find((s) => s.id === ui.session);
+
+					saved ? this.openSession(ui.session) : this.newSession(ui.session);
+				}
+			}
+			else if (e.key === this.store.key && !this.running) {
+				this.sessions = this.store.load();
+
+				const fresh = this.sessions.find((s) => s.id === this.session.id);
+
+				if (fresh && JSON.stringify(fresh) !== JSON.stringify(this.session)) {
+					this.session = fresh;
+					this.renderSession();
+				}
+				else {
+					this.refreshSessions();
+				}
+			}
+			else if (e.key === this.lock.key) {
+				this.tick();
+			}
+		}
+
+		onMessage(message) {
+			if (!message || typeof message !== 'object') {
+				return;
+			}
+
+			if (message.type === 'stop' && this.running && this.lock.mine() && message.session === this.session.id) {
+				this.stop();
+			}
+			else if (message.type === 'live' && !this.running && message.session === this.session.id) {
+				if (!this.liveNode) {
+					this.liveNode = this.addAssistant();
+					this.liveNode.classList.add('is-live');
+				}
+
+				this.liveNode.innerHTML = markdown(message.text);
+				this.scroll();
+			}
+		}
+
+		/* Zabbix is loading another page: keep everything so that page goes on from here. */
+		leave() {
+			this.unloading = true;
+			this.ui.set({draft: this.input.value, scroll: this.log.scrollTop, session: this.session.id});
+
+			if (this.running) {
+				this.persist();
+				this.lock.release(true);
+			}
 		}
 
 		/* Input */
@@ -532,8 +956,13 @@
 					this.submit();
 				}
 			}
-			else if (e.key === 'Escape' && this.running) {
-				this.stop();
+			else if (e.key === 'Escape') {
+				if (this.running) {
+					this.stop();
+				}
+				else if (this.host.escape) {
+					this.host.escape();
+				}
 			}
 		}
 
@@ -577,17 +1006,22 @@
 			});
 		}
 
+		clearInput() {
+			this.input.value = '';
+			this.fitInput();
+			this.palette.hidden = true;
+			this.ui.set({draft: ''});
+		}
+
 		submit() {
 			const text = this.input.value.trim();
 
-			if (text === '') {
+			if (text === '' || this.running) {
 				return;
 			}
 
-			this.input.value = '';
-			this.palette.hidden = true;
-
 			if (text.startsWith('/')) {
+				this.clearInput();
 				this.command(text);
 				return;
 			}
@@ -597,6 +1031,13 @@
 				return;
 			}
 
+			if (this.lock.elsewhere() !== null) {
+				this.system(t('The agent is working in another tab. Wait for it to finish, or stop it.'), 'is-warning');
+				return;
+			}
+
+			this.clearInput();
+
 			if (!this.session.title) {
 				this.session.title = text.slice(0, 50);
 			}
@@ -605,7 +1046,7 @@
 			this.session.messages.push({role: 'user', content: text});
 			this.addUser(text);
 			this.persist();
-			this.run();
+			this.run(false);
 		}
 
 		command(text) {
@@ -628,6 +1069,7 @@
 				case '/mode':
 					if (MODES.includes(arg)) {
 						this.mode = arg;
+						this.ui.set({mode: arg});
 						this.updateMode();
 					}
 					else {
@@ -641,6 +1083,7 @@
 					if (found) {
 						this.provider = found.id;
 						this.providerSelect.value = found.id;
+						this.ui.set({provider: found.id});
 					}
 
 					this.system(this.config.providers.map((p) =>
@@ -650,9 +1093,9 @@
 				}
 
 				case '/tools':
-					this.system(this.tools.map((tool) =>
+					this.loadTools().then(() => this.system(this.tools.map((tool) =>
 						(tool.read_only ? '○ ' : '✎ ') + tool.name + ' — ' + tool.title
-					).join('\n') || t('No tools available.'));
+					).join('\n') || t('No tools available.')));
 					break;
 
 				case '/sessions':
@@ -660,6 +1103,12 @@
 					break;
 
 				case '/forget':
+					if (this.lock.elsewhere() !== null) {
+						this.system(t('The agent is working in another tab. Wait for it to finish, or stop it.'),
+							'is-warning');
+						break;
+					}
+
 					this.store.clear();
 					this.sessions = [];
 					this.newSession();
@@ -683,7 +1132,20 @@
 
 		/* The agent */
 
+		/* The list of tools is kept in this tab for a few minutes, so that each page does not ask the MCP server. */
 		async loadTools() {
+			if (this.tools !== null) {
+				return;
+			}
+
+			const key = 'zbxagent.' + this.config.userid + '.tools';
+			const cached = readJson(sessionStorage, key, null);
+
+			if (cached && Date.now() - cached.ts < TOOLS_TTL && Array.isArray(cached.tools)) {
+				this.tools = cached.tools;
+				return;
+			}
+
 			try {
 				const response = await this.call('agent.tools', this.config.tokens.tools, {});
 				const data = await response.json();
@@ -693,20 +1155,77 @@
 				}
 				else {
 					this.tools = data.tools;
+					writeJson(sessionStorage, key, {ts: Date.now(), tools: data.tools});
+					return;
 				}
 			}
 			catch (e) {
-				this.system(t('Cannot use the MCP server') + ': ' + e.message, 'is-error');
+				if (!this.unloading) {
+					this.system(t('Cannot use the MCP server') + ': ' + e.message, 'is-error');
+				}
 			}
+
+			this.tools = this.tools || [];
 		}
 
-		async run() {
+		/* The tool calls of the last answer that have no result yet. */
+		openCalls() {
+			const answered = new Set(this.session.messages.filter((m) => m.role === 'tool').map((m) => m.tool_call_id));
+			const last = this.session.messages.filter((m) => m.role === 'assistant').pop();
+
+			return last ? (last.tool_calls || []).filter((call) => !answered.has(call.id)) : [];
+		}
+
+		/**
+		 * @param {boolean} resume  Go on with a run that a previous page left unfinished.
+		 */
+		async run(resume) {
+			this.starting = true;
+
+			const taken = await this.lock.take(this.session.id);
+
+			this.starting = false;
+
+			if (!taken) {
+				if (!resume) {
+					this.system(t('The agent is working in another tab. Wait for it to finish, or stop it.'), 'is-warning');
+				}
+
+				this.tick();
+				return;
+			}
+
 			this.setRunning(true);
+			this.setRemote(null);
 			this.abort = new AbortController();
 
+			if (!resume || !this.session.run) {
+				this.session.run = {step: 0, executing: null};
+			}
+
+			this.persist();
+
 			try {
-				for (let step = 0; ; step++) {
-					if (step >= this.config.max_steps) {
+				await this.loadTools();
+
+				if (resume) {
+					this.system(t('Continuing after changing page…'));
+
+					const open = this.openCalls();
+
+					if (open.length > 0) {
+						await this.runTools(open);
+					}
+				}
+
+				while (!this.abort.signal.aborted) {
+					const last = this.session.messages[this.session.messages.length - 1];
+
+					if (last && last.role === 'assistant' && (last.tool_calls || []).length === 0) {
+						break;
+					}
+
+					if (this.session.run.step >= this.config.max_steps) {
 						this.system(t('The agent reached the limit of steps. Say "continue" to go on.'), 'is-warning');
 						break;
 					}
@@ -714,6 +1233,8 @@
 					if (this.session.usage.last > this.config.context_tokens * 0.8) {
 						await this.compact(true);
 					}
+
+					this.session.run.step++;
 
 					const turn = await this.turn();
 
@@ -728,36 +1249,55 @@
 					}
 
 					await this.runTools(calls);
-
-					if (this.abort.signal.aborted) {
-						break;
-					}
 				}
 			}
 			catch (e) {
+				if (this.unloading) {
+					return;
+				}
+
 				if (e.name !== 'AbortError') {
 					this.system(e.message, 'is-error');
 				}
+			}
+
+			// The page is leaving: the next one goes on from the last saved step.
+			if (this.unloading) {
+				return;
 			}
 
 			if (this.abort.signal.aborted) {
 				this.system(t('Stopped.'));
 			}
 
-			this.closeOpenCalls();
+			const executing = this.session.run.executing;
+
+			delete this.session.run;
+			this.closeOpenCalls(t('Cancelled by the user.'), executing);
 			this.setRunning(false);
 			this.persist();
-			this.input.focus();
+			this.lock.release(false);
+
+			if (this.host.done) {
+				this.host.done();
+			}
+
+			if (!this.host.visible || this.host.visible()) {
+				this.input.focus();
+			}
 		}
 
-		/* Every tool call needs a result, or the provider rejects the next request. */
-		closeOpenCalls() {
+		/*
+		 * Every tool call needs a result, or the provider rejects the next request. A change that was already sent may
+		 * have been applied: the model is told so.
+		 */
+		closeOpenCalls(text, executing) {
 			const answered = new Set(this.session.messages.filter((m) => m.role === 'tool').map((m) => m.tool_call_id));
 
 			this.session.messages.slice().forEach((m) => {
 				(m.tool_calls || []).forEach((call) => {
 					if (!answered.has(call.id)) {
-						this.addResult(call, t('Cancelled by the user.'), true, 0);
+						this.addResult(call, call.id === executing ? UNCERTAIN : text, true, 0);
 					}
 				});
 			});
@@ -781,7 +1321,19 @@
 			});
 		}
 
+		/* Other pages show the answer as it arrives. */
+		share(text) {
+			const now = Date.now();
+
+			if (now - this.liveSent > 150) {
+				this.liveSent = now;
+				this.bus.send({type: 'live', session: this.session.id, text});
+			}
+		}
+
 		async turn() {
+			this.status('thinking');
+
 			const response = await this.call('agent.chat', this.config.tokens.chat, {
 				provider: this.provider,
 				mode: this.mode,
@@ -804,6 +1356,7 @@
 					text += value;
 					node = node || this.addAssistant();
 					node.innerHTML = markdown(text);
+					this.share(text);
 					this.scroll();
 				}
 				else if (type === 'reasoning') {
@@ -876,7 +1429,7 @@
 					return;
 				}
 
-				const block = this.addTool(call);
+				const block = this.toolBlocks[call.id] || this.addTool(call);
 
 				if (call.name === 'todo_write') {
 					this.session.todos = Array.isArray(call.arguments.todos) ? call.arguments.todos : [];
@@ -906,6 +1459,13 @@
 			let approved = readOnly;
 
 			if (!readOnly) {
+				// A change that was being applied when the page changed is never sent twice.
+				if (this.session.run.executing === call.id) {
+					this.session.run.executing = null;
+					this.addResult(call, UNCERTAIN, true, 0);
+					return;
+				}
+
 				if (this.mode === 'plan') {
 					this.addResult(call, 'Plan mode only allows read tools: propose this change instead.', true, 0);
 					return;
@@ -931,7 +1491,12 @@
 					this.addResult(call, 'The user rejected this change. Nothing was changed.', true, 0);
 					return;
 				}
+
+				this.session.run.executing = call.id;
+				this.persist();
 			}
+
+			this.status('tool');
 
 			const response = await this.call('agent.tool', this.config.tokens.tool, {
 				name: call.name,
@@ -941,10 +1506,13 @@
 			}, this.abort.signal);
 			const data = await response.json();
 
+			this.session.run.executing = null;
 			this.addResult(call, data.text, data.is_error, data.ms);
 		}
 
 		approve(call, tool) {
+			this.status('approval');
+
 			return new Promise((resolve) => {
 				const card = el('div', 'zbxagent-card zbxagent-approval');
 
@@ -959,12 +1527,13 @@
 				const finish = (decision, label) => {
 					this.pending = null;
 					actions.replaceWith(el('div', 'zbxagent-card-result', label));
+					this.status('thinking');
 					resolve(decision);
 				};
 
-				[['once', t('Allow'), ''], ['session', t('Allow in this chat'), 'btn-alt'], ['reject', t('Reject'), 'btn-alt']]
+				[['once', t('Allow'), 'is-primary'], ['session', t('Allow in this chat'), ''], ['reject', t('Reject'), '']]
 					.forEach(([decision, label, className]) => {
-						const button = el('button', className, label);
+						const button = el('button', 'zbxagent-button ' + className, label);
 
 						button.type = 'button';
 						button.addEventListener('click', () => finish(decision, label));
@@ -979,10 +1548,12 @@
 		}
 
 		ask(question) {
+			this.status('question');
+
 			return new Promise((resolve) => {
 				const card = el('div', 'zbxagent-card');
-				const input = el('input');
-				const send = el('button', '', t('Answer'));
+				const input = el('input', 'zbxagent-card-input');
+				const send = el('button', 'zbxagent-button is-primary', t('Answer'));
 
 				input.type = 'text';
 				input.setAttribute('aria-label', t('Answer'));
@@ -993,6 +1564,7 @@
 				const finish = (value) => {
 					this.pending = null;
 					actions.replaceWith(el('div', 'zbxagent-card-result', value === null ? t('Stopped.') : value));
+					this.status('thinking');
 					resolve(value);
 				};
 
@@ -1007,7 +1579,11 @@
 				card.append(el('div', 'zbxagent-card-title', question), actions);
 				this.log.append(card);
 				this.pending = finish;
-				input.focus();
+
+				if (!this.host.visible || this.host.visible()) {
+					input.focus();
+				}
+
 				this.scroll();
 			});
 		}
@@ -1018,11 +1594,17 @@
 			}
 
 			if (!inside) {
+				if (this.running || !(await this.lock.take(this.session.id))) {
+					return;
+				}
+
 				this.setRunning(true);
 				this.abort = new AbortController();
 			}
 
 			const note = this.system(t('Summarizing the conversation…'));
+
+			this.status('thinking');
 
 			try {
 				const response = await this.call('agent.chat', this.config.tokens.chat, {
@@ -1063,7 +1645,237 @@
 
 			if (!inside) {
 				this.setRunning(false);
+				this.lock.release(false);
 			}
+		}
+	}
+
+	/*
+	 * The floating chat: a button in the corner and a panel with three sizes. What is open and its size are kept for the
+	 * next page and shared with the other tabs.
+	 */
+	class Dock {
+		constructor(config) {
+			this.config = config;
+			this.ui = new UiState(config.userid);
+			this.state = 'idle';
+			this.unread = false;
+
+			this.root = el('div');
+			this.root.id = 'zbxagent-dock';
+
+			this.backdrop = el('div', 'zbxagent-backdrop');
+			this.backdrop.addEventListener('click', () => this.setSize('normal'));
+
+			this.launcher = el('button', 'zbxagent-launcher');
+			this.launcher.type = 'button';
+			this.launcher.innerHTML = icon('spark');
+			this.launcher.title = t('AI agent') + ' (Ctrl+.)';
+			this.launcher.setAttribute('aria-label', t('AI agent'));
+			this.launcher.append(el('span', 'zbxagent-badge'));
+			this.launcher.addEventListener('click', () => this.open());
+
+			this.panel = el('section', 'zbxagent-panel');
+			this.panel.setAttribute('role', 'dialog');
+			this.panel.setAttribute('aria-label', t('AI agent'));
+
+			const head = el('header', 'zbxagent-head');
+			const mark = el('span', 'zbxagent-mark');
+			mark.innerHTML = icon('spark');
+
+			const title = el('div', 'zbxagent-title');
+			title.append(el('strong', '', t('AI agent')));
+			this.statusLabel = el('span', 'zbxagent-state');
+			title.append(this.statusLabel);
+
+			const actions = el('div', 'zbxagent-head-actions');
+
+			if (config.settings_url) {
+				const settings = iconButton('gear', t('Settings'));
+				settings.addEventListener('click', () => { location.href = config.settings_url; });
+				actions.append(settings);
+			}
+
+			const page = iconButton('page', t('Open as a page'));
+			page.addEventListener('click', () => { location.href = config.page_url; });
+
+			this.sizeButton = iconButton('wide', t('Wide'), 'zbxagent-size');
+			this.sizeButton.addEventListener('click', () => this.setSize(this.size === 'wide' ? 'normal' : 'wide'));
+
+			const minimize = iconButton('min', t('Minimize'));
+			minimize.addEventListener('click', (e) => {
+				e.stopPropagation();
+				this.setSize(this.size === 'min' ? this.last : 'min');
+			});
+			this.minimizeButton = minimize;
+
+			const close = iconButton('close', t('Close'));
+			close.addEventListener('click', (e) => {
+				e.stopPropagation();
+				this.close();
+			});
+
+			actions.append(page, this.sizeButton, minimize, close);
+			head.append(mark, title, actions);
+			head.addEventListener('click', (e) => {
+				if (this.size === 'min' && !e.target.closest('button')) {
+					this.setSize(this.last);
+				}
+			});
+
+			this.body = el('div', 'zbxagent-body');
+
+			const chat = el('div');
+			chat.id = 'zbxagent';
+			this.body.append(chat);
+
+			this.panel.append(head, this.body);
+			this.panel.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape' && !e.defaultPrevented && e.target.closest('.zbxagent-input') === null) {
+					this.escape();
+				}
+			});
+
+			this.root.append(this.backdrop, this.panel, this.launcher);
+			document.body.append(this.root);
+
+			const ui = this.ui.get();
+
+			this.isOpen = ui.open;
+			this.size = SIZES.includes(ui.size) ? ui.size : 'normal';
+			this.last = ui.last === 'wide' ? 'wide' : 'normal';
+			this.render();
+
+			this.agent = new Agent(chat, config, {
+				status: (state) => this.status(state),
+				escape: () => this.escape(),
+				visible: () => this.isOpen && this.size !== 'min',
+				done: () => {
+					if (!this.isOpen || this.size === 'min') {
+						this.unread = true;
+						this.render();
+					}
+				}
+			});
+
+			document.addEventListener('keydown', (e) => {
+				if ((e.ctrlKey || e.metaKey) && e.key === '.') {
+					e.preventDefault();
+					this.isOpen ? this.close() : this.open();
+				}
+			});
+
+			window.addEventListener('storage', (e) => {
+				if (e.key === this.ui.key) {
+					const fresh = this.ui.get();
+
+					if (fresh.open !== this.isOpen || fresh.size !== this.size) {
+						this.isOpen = fresh.open;
+						this.size = SIZES.includes(fresh.size) ? fresh.size : 'normal';
+						this.last = fresh.last === 'wide' ? 'wide' : 'normal';
+						this.render();
+					}
+				}
+			});
+		}
+
+		open() {
+			this.isOpen = true;
+
+			if (this.size === 'min') {
+				this.size = this.last;
+			}
+
+			this.unread = false;
+			this.save();
+			this.render();
+			this.animate();
+			this.agent.scroll();
+			this.agent.input.focus();
+		}
+
+		/* Only when the user opens or resizes it: what the previous page had open appears without moving. */
+		animate() {
+			this.panel.classList.remove('is-anim');
+			void this.panel.offsetWidth;
+			this.panel.classList.add('is-anim');
+			clearTimeout(this.animTimer);
+			this.animTimer = setTimeout(() => this.panel.classList.remove('is-anim'), 250);
+		}
+
+		close() {
+			this.isOpen = false;
+			this.save();
+			this.render();
+			this.launcher.focus();
+		}
+
+		setSize(size) {
+			if (size !== 'min') {
+				this.last = size;
+				this.unread = false;
+			}
+
+			this.size = size;
+			this.isOpen = true;
+			this.save();
+			this.render();
+			this.animate();
+
+			if (size !== 'min') {
+				this.agent.scroll();
+				this.agent.input.focus();
+			}
+		}
+
+		escape() {
+			if (this.size === 'wide') {
+				this.setSize('normal');
+			}
+			else if (this.size === 'normal') {
+				this.setSize('min');
+			}
+		}
+
+		save() {
+			this.ui.set({open: this.isOpen, size: this.size, last: this.last});
+		}
+
+		status(state) {
+			this.state = state;
+			this.render();
+		}
+
+		render() {
+			const busy = this.state !== 'idle';
+			const needs = this.state === 'approval' || this.state === 'question';
+
+			this.root.dataset.open = this.isOpen ? 'true' : 'false';
+			this.root.dataset.size = this.size;
+			this.root.classList.toggle('is-busy', busy);
+			this.root.classList.toggle('needs-you', needs);
+			this.root.classList.toggle('has-unread', this.unread);
+			this.launcher.hidden = this.isOpen;
+			this.panel.hidden = !this.isOpen;
+			this.backdrop.hidden = !this.isOpen || this.size !== 'wide';
+
+			this.statusLabel.textContent = {
+				idle: '',
+				thinking: t('Thinking…'),
+				tool: t('Using a tool…'),
+				approval: t('Waiting for your approval'),
+				question: t('Waiting for your answer'),
+				remote: t('Working in another tab')
+			}[this.state] || '';
+
+			const wide = this.size === 'wide';
+
+			this.sizeButton.innerHTML = icon(wide ? 'narrow' : 'wide');
+			this.sizeButton.title = wide ? t('Normal size') : t('Wide');
+			this.sizeButton.setAttribute('aria-label', this.sizeButton.title);
+			this.minimizeButton.innerHTML = icon(this.size === 'min' ? 'normal' : 'min');
+			this.minimizeButton.title = this.size === 'min' ? t('Restore') : t('Minimize');
+			this.minimizeButton.setAttribute('aria-label', this.minimizeButton.title);
 		}
 	}
 
@@ -1261,25 +2073,51 @@
 		}
 	}
 
-	function start() {
+	/*
+	 * The chat page shows the chat in full; the settings page shows its form. Every other page of Zabbix gets the
+	 * floating chat, except kiosk mode and pages inside frames.
+	 */
+	async function start() {
 		const chat = document.getElementById('zbxagent');
 		const settings = document.getElementById('zbxagent-settings');
-		const root = chat || settings;
 
-		if (!root) {
+		if (chat) {
+			const config = JSON.parse(chat.dataset.config);
+
+			lang = config.lang || {};
+			new Agent(chat, config, {});
 			return;
 		}
 
-		const config = JSON.parse(root.dataset.config);
+		if (settings) {
+			const config = JSON.parse(settings.dataset.config);
 
-		lang = config.lang || {};
-
-		if (chat) {
-			new Agent(chat, config);
-		}
-		else {
+			lang = config.lang || {};
 			new SettingsForm(settings, config);
 		}
+
+		if (window.top !== window || document.querySelector('.layout-kioskmode') !== null
+				|| document.querySelector('aside.sidebar') === null) {
+			return;
+		}
+
+		let config;
+
+		try {
+			const response = await fetch('zabbix.php?action=agent.config', {credentials: 'same-origin'});
+
+			config = (await response.json()).config;
+		}
+		catch (e) {
+			return;
+		}
+
+		if (!config || !config.userid) {
+			return;
+		}
+
+		lang = config.lang || {};
+		new Dock(config);
 	}
 
 	if (document.readyState === 'loading') {

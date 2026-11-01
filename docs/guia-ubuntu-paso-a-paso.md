@@ -154,7 +154,7 @@ sudo ./scripts/install.sh
 python3 scripts/enable-module.py
 ```
 
-✅ **Debes ver** `Installed in .../modules/ZabbixAgent` y `ZabbixAgent: enabled`. El menú tendrá **Monitoring → AI agent**.
+✅ **Debes ver** `Installed in .../modules/ZabbixAgent` y `ZabbixAgent: enabled`. Al recargar Zabbix (con `Ctrl+F5` si actualizas) aparece el **botón redondo** abajo a la derecha, en todas las páginas, y el menú **Monitoring → AI agent**.
 
 ❌ **Si el frontend corre con otro usuario o grupo:** `sudo ZABBIX_WEB_GROUP=nginx ./scripts/install.sh`. Si no se encuentra el frontend, agrega `ZABBIX_UI=/ruta/al/frontend`.
 
@@ -176,9 +176,33 @@ En Zabbix, entra en **Monitoring → AI agent → Settings → Add provider**, c
 
 ## Paso 6. Usar el agente
 
-Abre **Monitoring → AI agent** y pregunta, por ejemplo: `¿Qué problemas están activos y qué tienen en común?`
+Pulsa el **botón redondo de la esquina inferior derecha**, en cualquier página de Zabbix, o `Ctrl+.`. Pregunta, por ejemplo: `¿Qué problemas están activos y qué tienen en común?`
 
 ![Agente](screenshots/agent.png)
+
+### El chat flotante
+
+| Tamaño | Cómo se ve | Cómo llegas |
+|---|---|---|
+| **Normal** | Panel abajo a la derecha; Zabbix sigue usable al lado | Botón redondo, o `Esc` desde amplio |
+| **Amplio** | Ventana centrada grande, con el fondo atenuado | Botón de ampliar de la cabecera |
+| **Minimizado** | Solo la barra del título, con lo que está haciendo el agente | Botón `–`, o `Esc` desde normal. Un clic en la barra lo restaura |
+| **Cerrado** | Solo el botón redondo. Un punto naranja avisa si espera tu aprobación; uno verde, que ya respondió | Botón `×` o `Ctrl+.` |
+
+![Chat amplio](screenshots/dock-wide.png)
+
+**Al cambiar de página, sección o módulo** el chat queda igual: abierto o no, tamaño, conversación, borrador y scroll. Zabbix carga una página nueva en cada clic, así que una respuesta en curso **continúa en la página siguiente** desde el último paso guardado:
+
+| Lo que pasaba al cambiar de página | Lo que hace la página nueva |
+|---|---|
+| El modelo escribía | Repite ese turno |
+| Una herramienta de lectura | La vuelve a ejecutar |
+| Esperaba tu aprobación o tu respuesta | Te la vuelve a pedir |
+| **Aplicaba un cambio** | **No lo repite.** Le dice al modelo que no se sabe si se aplicó y que lo compruebe |
+
+**Con varias pestañas**, una sola ejecuta el agente. Las otras muestran la conversación en vivo, en solo lectura, y su botón ■ la detiene. Si cierras la pestaña que trabaja, otra sigue en unos segundos.
+
+La página **Monitoring → AI agent** muestra el mismo chat a pantalla completa, con las mismas conversaciones.
 
 | Función | Cómo funciona |
 |---|---|
@@ -188,7 +212,7 @@ Abre **Monitoring → AI agent** y pregunta, por ejemplo: `¿Qué problemas est�
 | **Modos** | `Shift+Tab` alterna: *Preguntar*, *Plan* (solo lectura) y *Auto* (aplica cambios sin preguntar) |
 | **Tareas** | El agente muestra y actualiza su lista de tareas |
 | **Preguntas** | Si necesita una decisión, te pregunta y espera |
-| **Detener** | **Stop** o `Esc` |
+| **Detener** | Botón ■ o `Esc` |
 | **Contexto** | Resume la conversación al acercarse al límite, o con `/compact` |
 | **Comandos** | `/help`, `/clear`, `/compact`, `/mode`, `/model`, `/tools`, `/sessions`, `/forget` |
 
@@ -226,6 +250,9 @@ Abre **Monitoring → AI agent** y pregunta, por ejemplo: `¿Qué problemas est�
 | 6 | 6 | `Cannot modify header information` en el log, durante el streaming | La sesión intentaba guardar su cookie al terminar la respuesta | Corregido: se cierra antes de transmitir |
 | 7 | 6 | En plan, el agente decía que no existen herramientas de cambio | Solo veía las de lectura | Corregido en sus instrucciones |
 | 8 | 6 | Controles fuera de la pantalla en móvil | Ancho de la barra superior | Corregido en los estilos |
+| 9 | 6 | El panel quedaba debajo de la barra lateral en el teléfono | La barra lateral de Zabbix usa `z-index` 998 | El chat usa 999: encima de la barra y debajo de los diálogos de Zabbix (1000) |
+| 10 | 6 | Una pestaña nueva no seguía la conversación de la otra | Un chat sin mensajes no se guarda, y cada pestaña creaba uno con otro id | Todas las pestañas usan el id del chat activo |
+| 11 | 6 | Un proveedor respondía `HTTP 404` | Tenía tipo *Anthropic-compatible* con la URL `https://api.deepseek.com`, que es la de OpenAI | Usa la pareja correcta de la tabla del paso 5. **Test** lo detecta |
 
 ## Otros problemas posibles
 
@@ -240,6 +267,8 @@ No ocurrieron en esta prueba:
 | El texto aparece de golpe, no en streaming | Un proxy guarda la respuesta. Nginx respeta `X-Accel-Buffering: no`; en Apache, revisa `mod_proxy_fcgi` |
 | Se corta una respuesta muy larga | Sube `fastcgi_read_timeout` en Nginx. Aquí se dejó en 600 s |
 | **Maximum output tokens** corta las respuestas | Súbelo en **Settings** |
+| Tras actualizar no aparece el botón flotante, o se ve el estilo anterior | El navegador guarda la versión anterior de `agent.js` y `agent.css`: recarga con `Ctrl+F5` |
+| El botón no aparece en una página | No se muestra en modo kiosco ni dentro de marcos; en **Monitoring → AI agent** el chat ya ocupa la página |
 
 ## Actualizar y retirar
 

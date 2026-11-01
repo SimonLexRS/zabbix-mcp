@@ -154,7 +154,7 @@ sudo ./scripts/install.sh
 python3 scripts/enable-module.py
 ```
 
-✅ **You must see** `Installed in .../modules/ZabbixAgent` and `ZabbixAgent: enabled`. The menu will have **Monitoring → AI agent**.
+✅ **You must see** `Installed in .../modules/ZabbixAgent` and `ZabbixAgent: enabled`. When you reload Zabbix (with `Ctrl+F5` if you upgrade), the **round button** appears at the lower right of every page, and the menu has **Monitoring → AI agent**.
 
 ❌ **If the frontend runs under another user or group:** `sudo ZABBIX_WEB_GROUP=nginx ./scripts/install.sh`. If the frontend isn't found, add `ZABBIX_UI=/path/to/frontend`.
 
@@ -176,9 +176,33 @@ In Zabbix, go to **Monitoring → AI agent → Settings → Add provider**, fill
 
 ## Step 6. Use the agent
 
-Open **Monitoring → AI agent** and ask, for example: `Which problems are active, and what do they have in common?`
+Press the **round button in the lower-right corner**, on any page of Zabbix, or `Ctrl+.`. Ask, for example: `Which problems are active, and what do they have in common?`
 
 ![Agent](screenshots/agent.png)
+
+### The floating chat
+
+| Size | What it looks like | How you get there |
+|---|---|---|
+| **Normal** | Panel at the lower right; Zabbix stays usable next to it | Round button, or `Esc` from wide |
+| **Wide** | Large centered window, with the background dimmed | Expand button in the header |
+| **Minimized** | Only the title bar, with what the agent is doing | `–` button, or `Esc` from normal. A click on the bar restores it |
+| **Closed** | Only the round button. An orange dot means it waits for your approval; a green one, that it answered | `×` button or `Ctrl+.` |
+
+![Wide chat](screenshots/dock-wide.png)
+
+**When you change page, section or module** the chat stays the same: open or not, size, conversation, draft and scroll. Zabbix loads a new page on each click, so an answer in progress **goes on in the next page** from the last saved step:
+
+| What was happening when the page changed | What the new page does |
+|---|---|
+| The model was writing | Repeats that turn |
+| A read tool | Runs it again |
+| It waited for your approval or answer | Asks you again |
+| **It was applying a change** | **Doesn't repeat it.** Tells the model it is not known whether it was applied, and to check |
+
+**With several tabs**, only one runs the agent. The others show the conversation live, in read only, and their ■ button stops it. If you close the tab that works, another one goes on within a few seconds.
+
+The page **Monitoring → AI agent** shows the same chat full screen, with the same conversations.
 
 | Feature | How it works |
 |---|---|
@@ -188,7 +212,7 @@ Open **Monitoring → AI agent** and ask, for example: `Which problems are activ
 | **Modes** | `Shift+Tab` switches: *Ask*, *Plan* (read only) and *Auto* (applies changes without asking) |
 | **Tasks** | The agent shows and updates its task list |
 | **Questions** | When it needs a decision, it asks and waits |
-| **Stop** | **Stop** or `Esc` |
+| **Stop** | ■ button or `Esc` |
 | **Context** | Summarizes the conversation near the limit, or with `/compact` |
 | **Commands** | `/help`, `/clear`, `/compact`, `/mode`, `/model`, `/tools`, `/sessions`, `/forget` |
 
@@ -226,6 +250,9 @@ Open **Monitoring → AI agent** and ask, for example: `Which problems are activ
 | 6 | 6 | `Cannot modify header information` in the log, while streaming | The session tried to save its cookie at the end of the response | Fixed: it closes before streaming |
 | 7 | 6 | In plan mode, the agent said there were no change tools | It only saw the read ones | Fixed in its instructions |
 | 8 | 6 | Controls off screen on mobile | Width of the top bar | Fixed in the styles |
+| 9 | 6 | The panel was under the sidebar on a phone | The Zabbix sidebar uses `z-index` 998 | The chat uses 999: above the sidebar and below the Zabbix dialogs (1000) |
+| 10 | 6 | A new tab didn't follow the conversation of the other | A chat without messages isn't stored, and each tab created one with another id | All the tabs use the id of the active chat |
+| 11 | 6 | A provider answered `HTTP 404` | It had the *Anthropic-compatible* type with `https://api.deepseek.com`, the OpenAI URL | Use the right pair from the table of step 5. **Test** finds it |
 
 ## Other possible problems
 
@@ -240,6 +267,8 @@ These did not happen in this test:
 | Text appears all at once, not streaming | A proxy buffers the response. Nginx respects `X-Accel-Buffering: no`; on Apache, check `mod_proxy_fcgi` |
 | A very long response is cut | Raise `fastcgi_read_timeout` in Nginx. It was left at 600 s here |
 | **Maximum output tokens** cuts the answers | Raise it in **Settings** |
+| After upgrading, the floating button doesn't appear, or the old style is shown | The browser keeps the old `agent.js` and `agent.css`: reload with `Ctrl+F5` |
+| The button doesn't appear on a page | It isn't shown in kiosk mode or inside frames; in **Monitoring → AI agent** the chat already fills the page |
 
 ## Upgrade and remove
 

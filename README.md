@@ -18,7 +18,7 @@ English · [Español](README.es.md)
 
 </div>
 
-A frontend module for Zabbix 8 that adds an agentic chat in **Monitoring → AI agent**. It works with the permissions of each user, and with any provider compatible with OpenAI or Anthropic (Claude).
+A frontend module for Zabbix 8 that adds an agentic chat **floating on every page**: a button in the corner opens it minimized, normal or wide, and it stays open and keeps working while you move between sections. It works with the permissions of each user, and with any provider compatible with OpenAI or Anthropic (Claude).
 
 > [!WARNING]
 > **Early version.** It depends on Zabbix 8.0.0rc3, a release candidate. What the tools return is sent to the AI provider you choose.
@@ -33,7 +33,7 @@ A frontend module for Zabbix 8 that adds an agentic chat in **Monitoring → AI 
 | Step | What you do | How you know it worked |
 |---|---|---|
 | **1-3** | Install and configure the official MCP server | `---- MCP server is working` |
-| **4** | Install and enable the module | **Monitoring → AI agent** appears |
+| **4** | Install and enable the module | The chat button appears in the lower-right corner |
 | **5** | Connect your AI provider | `It works: <model>` |
 | **6** | Try the agent and the approvals | A rejection changes nothing; what you approve is audited |
 
@@ -41,6 +41,9 @@ A frontend module for Zabbix 8 that adds an agentic chat in **Monitoring → AI 
 
 | Feature | Detail |
 |---|---|
+| **Always at hand** | Floating button on every page. **Minimized**, **normal** or **wide**, and `Ctrl+.` to open or close it |
+| **Keeps going when you navigate** | Change section or module: the chat stays as it was, and an answer in progress goes on in the next page |
+| **Several tabs** | One tab runs the agent; the others follow it live and can stop it |
 | **Investigates on its own** | Chains tools: problems, hosts, triggers, items and history |
 | **Asks for approval** | Shows what will change, and does it only if you allow it |
 | **Three modes** | *Ask*, *Plan* (read only) and *Auto*. Switch with `Shift+Tab` |
@@ -50,7 +53,11 @@ A frontend module for Zabbix 8 that adds an agentic chat in **Monitoring → AI 
 | **Manages context** | Summarizes the conversation near the limit |
 | **Several providers** | OpenAI-compatible and Anthropic-compatible profiles, and switching between them |
 
-![Approval of a change](docs/screenshots/approval.png)
+| Normal, next to Zabbix | Minimized | Dark theme |
+|---|---|---|
+| ![Normal](docs/screenshots/dock-normal.png) | ![Minimized](docs/screenshots/dock-min.png) | ![Dark](docs/screenshots/dock-dark.png) |
+| **Another tab follows it live** | **Waiting for your approval** | **Phone** |
+| ![Other tab](docs/screenshots/dock-other-tab.png) | ![Approval](docs/screenshots/approval.png) | ![Phone](docs/screenshots/dock-mobile.png) |
 
 **Tools of the MCP server:** 12 read and 10 change: acknowledge, comment, change severity, suppress or close problems, and create, edit or delete maintenance periods.
 
@@ -82,11 +89,12 @@ Read the [risks and responsibilities](docs/ubuntu-step-by-step.md#security), esp
 | Guide run with its own commands | Ubuntu 26.10 ARM64, Zabbix 8.0.0rc3 built from source |
 | Real conversations | DeepSeek on its OpenAI-compatible and Anthropic-compatible APIs, with real data |
 | Real browser (Chromium) | Streaming, tools, approve and reject, plan, stop, `/compact`, mobile and an HTML injection attempt |
+| Floating chat (Chromium) | Three sizes, `Ctrl+.` and `Esc`; stays open across sections; an answer goes on after changing page; an approval comes back after changing page and a rejection changes nothing; a second tab follows in read only and takes over when the first closes; phone; no dock in kiosk mode |
 | Permissions | A user without access gets the API error, and can't open the settings |
 | Tests and CI | Message conversion, streams, encryption and translations |
 
 > [!NOTE]
-> **Not tested:** AMD64, Ubuntu 26.04, Zabbix from packages, Apache, and the own APIs of OpenAI and Anthropic. The Spanish interface and the native dark theme weren't seen on screen either.
+> **Not tested:** AMD64, Ubuntu 26.04, Zabbix from packages, Apache, and the own APIs of OpenAI and Anthropic. The Spanish interface wasn't seen on screen, and the dark theme was seen by switching the stylesheet, not with the user setting. The floating chat was tested with its new assets and `agent.config` served from the working copy, before installing them on the server.
 
 ## What's included
 

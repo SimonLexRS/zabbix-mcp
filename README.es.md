@@ -18,7 +18,7 @@ Español · [English](README.md)
 
 </div>
 
-Un módulo de frontend para Zabbix 8 que agrega un chat agéntico en **Monitoring → AI agent**. Trabaja con los permisos de cada usuario y funciona con cualquier proveedor compatible con OpenAI o con Anthropic (Claude).
+Un módulo de frontend para Zabbix 8 que agrega un chat agéntico **flotante en todas las páginas**: un botón en la esquina lo abre minimizado, normal o amplio, y sigue abierto y trabajando mientras cambias de sección. Trabaja con los permisos de cada usuario y funciona con cualquier proveedor compatible con OpenAI o con Anthropic (Claude).
 
 > [!WARNING]
 > **Versión temprana.** Depende de Zabbix 8.0.0rc3, una versión candidata. Lo que devuelven las herramientas se envía al proveedor de IA que elijas.
@@ -33,7 +33,7 @@ Un módulo de frontend para Zabbix 8 que agrega un chat agéntico en **Monitorin
 | Paso | Qué haces | Cómo sabes que funcionó |
 |---|---|---|
 | **1-3** | Instalas y configuras el servidor MCP oficial | `---- MCP server is working` |
-| **4** | Instalas y habilitas el módulo | Aparece **Monitoring → AI agent** |
+| **4** | Instalas y habilitas el módulo | Aparece el botón del chat en la esquina inferior derecha |
 | **5** | Conectas tu proveedor de IA | `It works: <modelo>` |
 | **6** | Pruebas el agente y las aprobaciones | Un rechazo no cambia nada; lo aprobado queda auditado |
 
@@ -41,6 +41,9 @@ Un módulo de frontend para Zabbix 8 que agrega un chat agéntico en **Monitorin
 
 | Función | Detalle |
 |---|---|
+| **Siempre a mano** | Botón flotante en todas las páginas. **Minimizado**, **normal** o **amplio**, y `Ctrl+.` para abrirlo o cerrarlo |
+| **Sigue al navegar** | Cambia de sección o de módulo: el chat queda como estaba, y una respuesta en curso continúa en la página siguiente |
+| **Varias pestañas** | Una pestaña ejecuta el agente; las demás lo siguen en vivo y pueden detenerlo |
 | **Investiga por su cuenta** | Encadena herramientas: problemas, hosts, triggers, ítems e historial |
 | **Pide aprobación** | Muestra qué va a cambiar, y solo lo hace si lo permites |
 | **Tres modos** | *Preguntar*, *Plan* (solo lectura) y *Auto*. Se alternan con `Shift+Tab` |
@@ -50,7 +53,11 @@ Un módulo de frontend para Zabbix 8 que agrega un chat agéntico en **Monitorin
 | **Gestiona el contexto** | Resume la conversación al acercarse al límite |
 | **Varios proveedores** | Perfiles OpenAI-compatible y Anthropic-compatible, y cambio entre ellos |
 
-![Aprobación de un cambio](docs/screenshots/approval.png)
+| Normal, junto a Zabbix | Minimizado | Tema oscuro |
+|---|---|---|
+| ![Normal](docs/screenshots/dock-normal.png) | ![Minimizado](docs/screenshots/dock-min.png) | ![Oscuro](docs/screenshots/dock-dark.png) |
+| **Otra pestaña lo sigue en vivo** | **Esperando tu aprobación** | **Teléfono** |
+| ![Otra pestaña](docs/screenshots/dock-other-tab.png) | ![Aprobación](docs/screenshots/approval.png) | ![Teléfono](docs/screenshots/dock-mobile.png) |
 
 **Herramientas del servidor MCP:** 12 de lectura y 10 de cambio: reconocer, comentar, cambiar severidad, suprimir o cerrar problemas, y crear, editar o borrar mantenimientos.
 
@@ -82,11 +89,12 @@ Lee los [riesgos y responsabilidades](docs/guia-ubuntu-paso-a-paso.md#seguridad)
 | Guía ejecutada con sus propios comandos | Ubuntu 26.10 ARM64, Zabbix 8.0.0rc3 compilado desde fuente |
 | Conversaciones reales | DeepSeek en sus API compatibles con OpenAI y con Anthropic, con datos reales |
 | Navegador real (Chromium) | Streaming, herramientas, aprobar y rechazar, plan, detener, `/compact`, móvil y un intento de inyectar HTML |
+| Chat flotante (Chromium) | Tres tamaños, `Ctrl+.` y `Esc`; sigue abierto entre secciones; una respuesta continúa tras cambiar de página; una aprobación vuelve tras cambiar de página y un rechazo no cambia nada; una segunda pestaña lo sigue en solo lectura y lo retoma al cerrar la primera; teléfono; sin chat en modo kiosco |
 | Permisos | Un usuario sin acceso recibe el error de la API, y no puede abrir los ajustes |
 | Tests y CI | Conversión de mensajes, streams, cifrado y traducciones |
 
 > [!NOTE]
-> **Sin comprobar:** AMD64, Ubuntu 26.04, Zabbix por paquetes, Apache, y las API propias de OpenAI y Anthropic. La interfaz en español y el tema oscuro nativo tampoco se vieron en pantalla.
+> **Sin comprobar:** AMD64, Ubuntu 26.04, Zabbix por paquetes, Apache, y las API propias de OpenAI y Anthropic. La interfaz en español no se vio en pantalla, y el tema oscuro se vio cambiando la hoja de estilos, no con el ajuste del usuario. El chat flotante se probó con sus archivos nuevos y `agent.config` servidos desde la copia de trabajo, antes de instalarlos en el servidor.
 
 ## Qué incluye
 

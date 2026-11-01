@@ -172,6 +172,11 @@ namespace Modules\ZabbixAgent\Includes {
 	check('ask prompt', strpos(Prompt::build('ask', '', 'u', 0), 'Plan mode is active'), false);
 	check('instructions', strpos(Prompt::build('ask', 'Be kind', 'u', 0), 'Be kind') !== false, true);
 
+	// The floating chat asks every page for its configuration.
+	$manifest = json_decode(file_get_contents(dirname(__DIR__).'/modules/ZabbixAgent/manifest.json'), true);
+	check('config action', $manifest['actions']['agent.config']['class'] ?? null, 'Config');
+	check('assets on every page', $manifest['assets']['js'] ?? null, ['agent.js']);
+
 	// Translations: everything used by the code exists in Spanish.
 	$module = dirname(__DIR__).'/modules/ZabbixAgent';
 	$catalog = require $module.'/lang/es.php';

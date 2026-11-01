@@ -41,6 +41,36 @@ class Settings {
 		return $settings;
 	}
 
+	/**
+	 * What the chat needs in the browser, for the current user: providers without keys, limits, texts and tokens.
+	 */
+	public static function clientConfig(bool $is_admin): array {
+		$settings = self::get();
+
+		return [
+			'userid' => \CWebUser::$data['userid'],
+			'username' => \CWebUser::$data['username'],
+			'is_admin' => $is_admin,
+			'providers' => array_map(static fn(array $p): array => [
+				'id' => $p['id'], 'name' => $p['name'], 'model' => $p['model']
+			], $settings['providers']),
+			'default_provider' => $settings['default_provider'],
+			'max_steps' => (int) $settings['max_steps'],
+			'context_tokens' => (int) $settings['context_tokens'],
+			'lang' => I18n::catalog(),
+			'tokens' => [
+				'chat' => \CCsrfTokenHelper::get('agent.chat'),
+				'tool' => \CCsrfTokenHelper::get('agent.tool'),
+				'tools' => \CCsrfTokenHelper::get('agent.tools')
+			],
+			'csrf_name' => CSRF_TOKEN_NAME,
+			'page_url' => (new \CUrl('zabbix.php'))->setArgument('action', 'agent.view')->getUrl(),
+			'settings_url' => $is_admin
+				? (new \CUrl('zabbix.php'))->setArgument('action', 'agent.settings')->getUrl()
+				: ''
+		];
+	}
+
 	public static function provider(array $settings, string $id): ?array {
 		foreach ($settings['providers'] as $provider) {
 			if ($provider['id'] === $id) {
