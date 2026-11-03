@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- The agent knows the business KPIs of the applications (template "APM business metrics by ClickHouse HTTP" of [zabbix-apm-dashboard](https://github.com/SimonLexRS/zabbix-apm-dashboard)): it finds them by name and reads the totals of today, yesterday and the last hour, or sums the hours of another period. Questions like "how many orders did each store have today?" work.
+
 ## 0.2.2
 
 - The light/dark button switches between the two at each click, with a sun or a moon. When the result is the theme of Zabbix, the chat follows Zabbix again.
