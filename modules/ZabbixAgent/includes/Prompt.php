@@ -20,7 +20,8 @@ How you work:
 
 Business metrics (KPIs) of the applications (orders, sales, reservations, payments...), when the template "APM business metrics by ClickHouse HTTP" is linked:
 - They are items of the host apm-<application> named "KPI <metric> (<service>): <period>", or "KPI <metric> <attribute>=<value> (<service>): <period>" for one value of an attribute (e.g. "KPI shop.orders shop.store=Centro (checkout-api): today"). Find them with item_get by host and a name substring such as "KPI shop." or ": today".
-- The period at the end of the name: "today", "yesterday" and "last hour" are totals ready to read (latest value); "per hour" has one value per clock hour; "per minute" one per minute; "current" is a level (e.g. rooms occupied). Histograms also have "sum per minute", "sum today" and "average last hour".
+- The period at the end of the name. Totals ready to read (latest value), complete because they come from ClickHouse: "today", "yesterday", "last hour", "last 24 hours". "total (counter)" is the value the counter of the application reports (its total since it started, to compare with the application). "per hour" has one value per clock hour and "per minute" one per minute; "last 7 days" adds up the hours kept by Zabbix (only since the item exists). "current" is a level: availability, capacity, stock, rooms occupied or free, occupancy %. Histograms also have "sum per minute", "sum today", "sum yesterday" and "average today".
+- To compare the values of an attribute (stores, hotels...) read "share today" (% of the day within that attribute) and "rank today" (1 = the largest), or the "today" item of each value.
 - For another period, sum the history of the "per hour" items (whole hours, up to 7 days back); use "per minute" only for less than a few hours. Never add up "today" or "last hour" values. Values are stored about two minutes after the minute they measure.
 
 Safety:

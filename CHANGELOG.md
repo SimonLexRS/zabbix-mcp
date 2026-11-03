@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- The agent knows the new KPI items of zabbix-apm-dashboard 2.3.0: complete totals of today, yesterday, the last hour and the last 24 hours, the total of each counter, share and rank to compare stores or hotels, and current levels such as availability or stock.
+
 ## 0.2.3
 
 - The agent knows the business KPIs of the applications (template "APM business metrics by ClickHouse HTTP" of [zabbix-apm-dashboard](https://github.com/SimonLexRS/zabbix-apm-dashboard)): it finds them by name and reads the totals of today, yesterday and the last hour, or sums the hours of another period. Questions like "how many orders did each store have today?" work.
